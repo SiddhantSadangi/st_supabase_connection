@@ -2,6 +2,9 @@ import streamlit as st
 
 from st_supabase_connection import SupabaseConnection
 
+# TODO: Let users use their own keys and data sources. Give option of using default keys if they don't have their own
+# TODO: Build your query format if using their keys (enter tablename, select operation, etc). Disable table modifying methods (insert, update, delete) if using mine
+
 st.header("Streamlit SupabaseConnection")
 
 st.write(
@@ -32,7 +35,8 @@ client = st.experimental_connection(
 
 st.success("✅ Connection initialized!")
 
-st.subheader("🧺 Fetch data from Supabase DB")
+st.subheader("🧺 Fetch data")
+
 st.write("🔍 A simple `SELECT * FROM countries`")
 st.code(
     """data, count = client.select(table_name="countries", select_query="*", ttl=0)""",
@@ -45,60 +49,108 @@ st.dataframe(data, use_container_width=True)
 
 st.write("**🤏 Select only specified columns**")
 st.write("**📝 Task:** Select only the `name` and `capital` columns from `countries`")
-select_query = st.text_input(
+select_cols_query = st.text_input(
     "Enter the `select_query` string",
     help="Enter column names as comma-separated values",
+    key="select_cols",
 )
 st.write("Constructed query")
 st.code(
     f"""
-    data, count = client.select(table_name="countries",
-                                select_query="{select_query}",
-                                ttl=0)
+    data, count = client.select(
+        table_name="countries",
+        select_query="{select_cols_query}",
+        ttl=0,
+        )
     """,
     language="python",
 )
-
-if select_query:
-    data, count = client.select(table_name="countries", select_query=select_query, ttl=0)
+st.write("Results")
+if select_cols_query:
+    data, count = client.select(table_name="countries", select_query=select_cols_query, ttl=0)
     st.dataframe(data, use_container_width=True)
-
+else:
+    st.dataframe()
 with st.expander(label="✅ Answer", expanded=False):
     st.code("name,capital")
 
-# TODO: Handle joins
-# st.write("**🤏 Query foreign tables**")
-# st.write("We have a `cities` table containing `id`, `country_id`, and `name` columns. `cities.country_id` references `country.id` as a foreign key")
-# st.write("**📝 Task:** Select `name` from the `countries` and `cities` tables")
-# select_query = st.text_input(
-#     "Enter the `select_query` string",
-#     help="Foreign table columns can be queries using the format `table_name(column_name)`",)
-# st.write("Constructed query")
-# st.code(
-#     f"""
-#     data, count = client.select(table_name="countries",
-#                                 select_query="{select_query}",
-#                                 ttl=0)
-#     """,
-#     language="python"
-# )
+st.write("**🤏 Filter tables**")
+st.write("**📝 Task:** Select countries in Europe")
+select_cols_and_filter_string = st.text_input(
+    "Enter the `filter_string`",
+    help="`filter_string` takes the format `column_name,value to match`",
+    key="select_cols_and_filter",
+)
+st.write("Constructed query")
+st.code(
+    f"""
+    data, count = client.select(
+        table_name="countries",
+        select_query="*",
+        filter_string="{select_cols_and_filter_string}",
+        ttl=0,
+        )
+    """,
+    language="python",
+)
+st.write("Results")
+data, count = client.select(
+    table_name="countries",
+    select_query="*",
+    filter_string=select_cols_and_filter_string,
+    ttl=0,
+)
+st.dataframe(data, use_container_width=True)
 
-# if select_query:
-#     data, count = client.select(table_name="countries", select_query=select_query, ttl=0)
-#     st.dataframe(data, use_container_width=True)
+with st.expander(label="✅ Answer", expanded=False):
+    st.code("continent,Europe")
 
-# with st.expander(label="✅ Answer", expanded=False):
-#     st.code("name,cities(name)")
-
-if count:
-    st.text(f"Query returned {count[-1]} rows")
+st.write("**🔢 Get the count of rows returned**")
+st.write("**📝 Task:** Get the total number of countries in the database")
+count_method = st.selectbox(
+    "Select the `count_method`",
+    options=[None, "exact", "planned", "estimated"],
+    help=""" `"exact"`: Exact but slow count algorithm. Performs a `COUNT(*)` under the hood.\n
+    `"planned"`: Approximated but fast count algorithm. Uses the Postgres statistics under the hood.\n
+    `"estimated"`: Uses exact count for low numbers and planned count for high numbers.""",
+    key="count_method",
+)
+st.write("Constructed query")
+st.code(
+    f"""
+    data, count = client.select(
+        table_name="countries",
+        select_query="*",
+        count_method="{count_method}",
+        ttl=0,
+        )
+    """,
+    language="python",
+)
+data, count = client.select(
+    table_name="countries", select_query="*", count_method=count_method, ttl=0
+)
+st.write(f"Result: {count}")
 
 st.info(
     "📖 Read the [Supabase Python API reference](https://supabase.com/docs/reference/python/select) for all available options."
 )
 
+st.subheader("➕ Insert data")
+st.code(
+    """
+    client.insert(
+        table_name="countries",
+        insert_rows={
+            "name": "USA",
+            "capital":"Washington DC",
+            "continent":"North America"
+            }
+        )
+    """,
+    language="python",
+)
 
-client.insert(table_name="countries", insert_rows={"name": "India"})
 
 data, count = client.select(table_name="countries", select_query="*")
 

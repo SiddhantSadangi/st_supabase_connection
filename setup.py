@@ -33,5 +33,5 @@ setuptools.setup(
     ],
     keywords=["streamlit", "supabase"],
     python_requires=">=3.8",
-    install_requires=["streamlit>=1.2", "supabase", "pandas"],
+    install_requires=["streamlit>=1.2", "supabase"],
 )
