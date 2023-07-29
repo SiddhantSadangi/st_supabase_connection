@@ -83,7 +83,7 @@ APIResponse(data=[{'name': 'Bali', 'countries': None},
 > All supported **database** operations and syntax are mentioned in the [`postgrest-py` API reference](https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html).  
 > All supported **storage** operations and syntax are mentioned in the [Supabase Python client API reference](https://supabase.com/docs/reference/python/storage-createbucket).
 
-[![See demo in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-lgn-form.streamlit.app/)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-supabase-connection.streamlit.app/)
 
 ## 🤗 Want to support my work?
 <p align="center">
