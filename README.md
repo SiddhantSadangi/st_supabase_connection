@@ -1,77 +1,87 @@
-# :lock: st-supabase-connection
+# :handshake: st-supabase-connection
 [![Downloads](https://static.pepy.tech/personalized-badge/st-supabase-connection?period=total&units=international_system&left_color=black&right_color=brightgreen&left_text=Downloads)](https://pepy.tech/project/st-supabase-connection)
 
-A streamlit component that creates a user login form connected to a Supabase DB. It lets users create a new username and password, login to an existing account, or login as an anonymous guest.
-
-![Form screenshot](assets/screenshot.png)
-
-The login form collapses after login to free screen-space.
+A Streamlit connection component to connect Streamlit to Supabase.
 
 ## :computer: Demo app
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-lgn-form.streamlit.app/)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-supabase-connection.streamlit.app/)
 
-## :construction: Installation
+## :construction: Setup
 
 1. Install `st-supabase-connection`
 ```sh
 pip install st-supabase-connection
 ```
-2. Create a Supabase project as mentioned [here](https://docs.streamlit.io/knowledge-base/tutorials/databases/supabase#sign-in-to-supabase-and-create-a-project)
-3. Create a table to store the usernames and passwords. The table name and column names can be as per your choice.
-```sql
-CREATE TABLE users (
-    username text not null default ''::text,
-    password text not null,
-    constraint users_pkey primary key (username),
-    constraint users_username_key unique (username),
-    constraint users_password_check check (
-      (
-        length(
-          trim(
-            both
-            from
-              password
-          )
-        ) > 1
-      )
-    ),
-    constraint users_username_check check (
-      (
-        length(
-          trim(
-            both
-            from
-              username
-          )
-        ) > 1
-      )
-    )
-  ) tablespace pg_default;
-```
-4. Follow the rest of the steps from [here](https://docs.streamlit.io/knowledge-base/tutorials/databases/supabase#copy-your-app-secrets-to-the-cloud) to connect your Streamlit app to Supabase
+2. Set the `SUPABASE_URL` and `SUPABASE_KEY` Streamlit secrets as described [here](https://docs.streamlit.io/streamlit-community-cloud/get-started/deploy-an-app/connect-to-data-sources/secrets-management)
 
+> [!NOTE]  
+> For local development outside Streamlit, you can also set these as your environment variables (recommended), or pass these to the `url` and `key` args of `st.experimental_connection()` (not recommended).
 
 ## :pen: Usage
 
-`login_form()` sets `session_state["authenticated"]` to `True` if the login is successful, `session_state["username"]` to the `username` or new or existing user, and to `None` for guest login.
+1. Import
+  ```python
+  import streamlit as st
+  from st_supabase_connection import SupabaseConnection
+  ```
+2. Initialize
+  ```python
+  supabase = st.experimental_connection(
+      name="YOUR_CONNECTION_NAME",
+      type=SupabaseConnection,
+      url="YOUR_SUPABASE_URL", # not needed if provided as a streamlit secret
+      key="YOUR_SUPABASE_KEY", # not needed if provided as a streamlit secret
+  )
+  ```
+  This returns the same Supabase client as Supabase's `create_client()` method.
 
-Returns the initialized `supabase.Client` instance to let you interact with the databse downstream in the script.
+3. Use the client as you as you would with the Supabase Python API
+> [!WARNING]  
+> Currently only the Supabase Database and Storage methods are supported.
 
 ```python
-import streamlit as st
+# Database operations
+# -------------------
 
-from streamlit_login import login_form
+# Simple query
+>>> supabase.table('countries').select("*").execute()
+APIResponse(data=[{'id': 1, 'name': 'Afghanistan'},
+                  {'id': 2, 'name': 'Albania'},
+                  {'id': 3, 'name': 'Algeria'}],
+            count=None)
 
-client = login_form()
+# Query with join
+>>> supabase.table('users').select('name, teams(name)').execute()
+APIResponse(data=[
+                  {'name': 'Kiran', 'teams': [{'name': 'Green'}, {'name': 'Blue'}]},
+                  {'name': 'Evan', 'teams': [{'name': 'Blue'}]}
+                 ],
+            count=None)
 
-if st.session_state["authenticated"]:
-    if st.session_state["username"]:
-        st.success(f"Welcome {st.session_state['username']}")
-    else:
-        st.success("Welcome guest")
-else:
-    st.error("Not authenticated")
+# Filter through foreign tables
+>>> supabase.table('cities').select('name, countries(*)').eq('countries.name', 'Estonia').execute()
+APIResponse(data=[{'name': 'Bali', 'countries': None},
+                  {'name': 'Munich', 'countries': None}],
+            count=None)
+
+# Storage operations
+# ------------------
+
+# Create a bucket
+>>> supabase.storage.create_bucket("new_bucket")
+{'name': 'new_bucket'}
+
+# Download a file
+>>> with open("file.txt", "wb+") as f:
+>>>   res = supabase.storage.from_("new_bucket").download("file.txt")
+>>>   f.write(res)
+
+# Delete a bucket
+>>> supabase.storage.delete_bucket("new_bucket")
 ```
+> [!NOTE]  
+> All supported **database** operations and syntax are mentioned in the [`postgrest-py` API reference](https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html).  
+> All supported **storage** operations and syntax are mentioned in the [Supabase Python client API reference](https://supabase.com/docs/reference/python/storage-createbucket).
 
 [![See demo in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-lgn-form.streamlit.app/)
 

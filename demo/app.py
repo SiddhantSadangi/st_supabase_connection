@@ -5,18 +5,29 @@ from st_supabase_connection import SupabaseConnection
 
 VERSION = st_supabase_connection.__version__
 
+st.set_page_config(
+    page_title="Streamlit SupabaseConnection Demo app",
+    page_icon="🔌",
+    menu_items={
+        "About": f"🔌 Streamlit Supabase Connection v{VERSION}  "
+        f"\nContact: [Siddhant Sadangi](mailto:siddhant.sadangi@gmail.com)",
+        "Report a Bug": "https://github.com/SiddhantSadangi/st_supabase_connection/issues/new",
+        "Get help": None,
+    },
+)
+
 # TODO: Let users use their own keys and data sources. Give option of using default keys if they don't have their own
 # TODO: Build your query format if using their keys (enter tablename, select operation, etc). Disable table modifying methods (insert, update, delete) if using mine
 
 # ---------- SIDEBAR ----------
-with open("assets/sidebar.html", "r", encoding="UTF-8") as sidebar_file:
+with open("demo/sidebar.html", "r", encoding="UTF-8") as sidebar_file:
     sidebar_html = sidebar_file.read().replace("{VERSION}", VERSION)
 
 with st.sidebar:
     st.components.v1.html(sidebar_html, height=600)
 
 # ---------- MAIN PAGE ----------
-st.header("Streamlit SupabaseConnection")
+st.header("🔌 Streamlit SupabaseConnection")
 
 st.write(
     "📖 Interactive tutorial for the `st_supabase_connection` Streamlit connection for Supabase Database."

@@ -27,7 +27,7 @@ setuptools.setup(
     project_urls={
         "Homepage": "https://github.com/SiddhantSadangi/st_supabase_connection",
         "Documentation": "https://github.com/SiddhantSadangi/st_supabase_connection/blob/main/README.md",
-        "Support": "https://www.buymeacoffee.com/siddhantsadangi",
+        "Funding": "https://www.buymeacoffee.com/siddhantsadangi",
     },
     packages=setuptools.find_packages(where="src"),
     package_dir={"": "src"},
