@@ -16,166 +16,207 @@ st.set_page_config(
     },
 )
 
-# TODO: Let users use their own keys and data sources. Give option of using default keys if they don't have their own
-# TODO: Build your query format if using their keys (enter tablename, select operation, etc). Disable table modifying methods (insert, update, delete) if using mine
+# ---------- SESSION STATE ----------
+upsert = None
+
+if "client" not in st.session_state:
+    st.session_state["client"] = None
+
+if "project" not in st.session_state:
+    st.session_state["project"] = "demo"
+
+if "initialized" not in st.session_state:
+    st.session_state["initialized"] = False
 
 # ---------- SIDEBAR ----------
 with open("demo/sidebar.html", "r", encoding="UTF-8") as sidebar_file:
     sidebar_html = sidebar_file.read().replace("{VERSION}", VERSION)
 
 with st.sidebar:
+    st.info(
+        """
+        API Reference
+        -------------
+        - Database operations: [postgrest-py API reference](https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html)
+        - Storage operations: [Supabase Python client API reference](https://supabase.com/docs/reference/python/storage-createbucket)
+        """,
+    )
     st.components.v1.html(sidebar_html, height=600)
 
 # ---------- MAIN PAGE ----------
-st.header("🔌 Streamlit SupabaseConnection")
+st.header("🔌Streamlit SupabaseConnection Demo")
 
-st.write(
-    "📖 Interactive tutorial for the `st_supabase_connection` Streamlit connection for Supabase Database."
+st.write("📖 Interactive demo for the `st_supabase_connection` Streamlit connection for Supabase.")
+
+st.subheader("🏗️ Initialize Connection")
+
+project = st.radio(
+    label="Select Supabase project (demo project recommended for Supabase beginners)",
+    options=[
+        "Demo project",
+        "My own project",
+    ],
+    horizontal=True,
 )
 
-st.subheader("🏗️ Installation")
-st.code("pip install st_supabase_connection", language="bash")
+if project == "Demo project":
+    st.session_state["project"] = "demo"
+    st.warning(
+        "DML operations (INSERT, UPSERT, UPDATE, DELETE) not allowed",
+        icon="⚠️",
+    )
+    if st.button(
+        "Initialize client ⚡",
+        type="primary",
+        use_container_width=True,
+    ):
+        try:
+            st.session_state["client"] = st.experimental_connection(
+                name="demo_supabase_connection",
+                type=SupabaseConnection,
+            )
+            st.session_state["initialized"] = True
+        except Exception as e:
+            st.error(
+                f"""Client initialization failed
+                {e}""",
+                icon="❌",
+            )
+            st.session_state["initialized"] = False
 
-st.subheader("🔌 Initializing connection")
+elif project == "My own project":
+    st.session_state["project"] = "custom"
+    with st.expander(
+        label="Supabase credentials",
+        expanded=not st.session_state["initialized"],
+    ):
+        with st.form(key="credentials"):
+            url = st.text_input(
+                "Enter Supabase URL",
+                type="password",
+                help="""
+                This is evaluated only when a  query is run.
+                If you get a "getaddrinfo failed" error, check the URL.
+                """,
+            )
+            key = st.text_input("Enter Supabase key", type="password")
+
+            if st.form_submit_button(
+                "Initialize client ⚡",
+                type="primary",
+                use_container_width=True,
+            ):
+                try:
+                    st.session_state["client"] = st.experimental_connection(
+                        name="demo_supabase_connection",
+                        type=SupabaseConnection,
+                        url=url,
+                        key=key,
+                    )
+                    st.session_state["initialized"] = True
+                except Exception as e:
+                    st.error(
+                        f"""Client initialization failed
+                        {e}""",
+                        icon="❌",
+                    )
+                    st.session_state["initialized"] = False
+
+st.write("A connection will be initialized as:")
 st.code(
     """
-import streamlit as st
-from st_supabase_connection import SupabaseConnection
-
-client = st.experimental_connection(
-    name="demo_supabase_connection",
-    type=SupabaseConnection,
-)
-""",
-    language="python",
-)
-
-client = st.experimental_connection(
-    name="demo_supabase_connection",
-    type=SupabaseConnection,
-)
-
-st.success("✅ Connection initialized!")
-
-st.subheader("🧺 Fetch data")
-
-st.write("🔍 A simple `SELECT * FROM countries`")
-st.code(
-    """data, count = client.select(table_name="countries", select_query="*", ttl=0)""",
-    language="python",
-)
-
-data, count = client.select(table_name="countries", select_query="*", ttl=0)
-
-st.dataframe(data, use_container_width=True)
-
-st.write("**🤏 Select only specified columns**")
-st.write("**📝 Task:** Select only the `name` and `capital` columns from `countries`")
-select_cols_query = st.text_input(
-    "Enter the `select_query` string",
-    help="Enter column names as comma-separated values",
-    key="select_cols",
-)
-st.write("Constructed query")
-st.code(
-    f"""
-    data, count = client.select(
-        table_name="countries",
-        select_query="{select_cols_query}",
-        ttl=0,
-        )
-    """,
-    language="python",
-)
-st.write("Results")
-if select_cols_query:
-    data, count = client.select(table_name="countries", select_query=select_cols_query, ttl=0)
-    st.dataframe(data, use_container_width=True)
-else:
-    st.dataframe()
-with st.expander(label="✅ Answer", expanded=False):
-    st.code("name,capital")
-
-st.write("**🤏 Filter tables**")
-st.write("**📝 Task:** Select countries in Europe")
-select_cols_and_filter_string = st.text_input(
-    "Enter the `filter_string`",
-    help="`filter_string` takes the format `column_name,value to match`",
-    key="select_cols_and_filter",
-)
-st.write("Constructed query")
-st.code(
-    f"""
-    data, count = client.select(
-        table_name="countries",
-        select_query="*",
-        filter_string="{select_cols_and_filter_string}",
-        ttl=0,
-        )
-    """,
-    language="python",
-)
-st.write("Results")
-data, count = client.select(
-    table_name="countries",
-    select_query="*",
-    filter_string=select_cols_and_filter_string,
-    ttl=0,
-)
-st.dataframe(data, use_container_width=True)
-
-with st.expander(label="✅ Answer", expanded=False):
-    st.code("continent,Europe")
-
-st.write("**🔢 Get the count of rows returned**")
-st.write("**📝 Task:** Get the total number of countries in the database")
-count_method = st.selectbox(
-    "Select the `count_method`",
-    options=[None, "exact", "planned", "estimated"],
-    help=""" `"exact"`: Exact but slow count algorithm. Performs a `COUNT(*)` under the hood.\n
-    `"planned"`: Approximated but fast count algorithm. Uses the Postgres statistics under the hood.\n
-    `"estimated"`: Uses exact count for low numbers and planned count for high numbers.""",
-    key="count_method",
-)
-st.write("Constructed query")
-st.code(
-    f"""
-    data, count = client.select(
-        table_name="countries",
-        select_query="*",
-        count_method="{count_method}",
-        ttl=0,
-        )
-    """,
-    language="python",
-)
-data, count = client.select(
-    table_name="countries", select_query="*", count_method=count_method, ttl=0
-)
-st.write(f"Result: {count}")
-
-st.info(
-    "📖 Read the [Supabase Python API reference](https://supabase.com/docs/reference/python/select) for all available options."
-)
-
-st.subheader("➕ Insert data")
-st.code(
-    """
-    client.insert(
-        table_name="countries",
-        insert_rows={
-            "name": "USA",
-            "capital":"Washington DC",
-            "continent":"North America"
-            }
-        )
+    supabase = st.experimental_connection(
+        name="demo_supabase_connection",
+        type=SupabaseConnection,
+        url=url, # Not required if present as a Streamlit secret
+        key=key, # Not required if present as a Streamlit secret
+    )
     """,
     language="python",
 )
 
+if st.session_state["initialized"]:
+    st.success("Client initialized!", icon="✅")
+    st.subheader("🪄 Run Queries")
+    if st.session_state["project"] == "custom":
+        st.info(
+            "You are using your own project. Be careful while running DML queries!",
+            icon="ℹ️",
+        )
+        table = st.text_input(
+            "Enter the table name",
+            value="countries",
+            placeholder="countries",
+        )
 
-data, count = client.select(table_name="countries", select_query="*")
+        lcol, mcol, rcol = st.columns(3)
+        request_builder = lcol.selectbox(
+            "Enter the request builder",
+            options=["select", "insert", "upsert", "update", "delete"],
+        )
+        count_method = mcol.selectbox(
+            "Enter the count method",
+            options=[None, "exact", "planned", "estimated"],
+            help=f"""
+            Count algorithm to use to count {request_builder}ed rows.
+            `None`: Does not return a count
+            `"exact"`: Exact but slow count algorithm. Performs a `COUNT(*)` under the hood.
+            `"planned"`: Approximated but fast count algorithm. Uses the Postgres statistics under the hood.
+            `"estimated"`: Uses exact count for low numbers and planned count for high numbers.
+            """,
+        )
+        rcol_placeholder = rcol.empty()
 
-if count:
-    st.text(f"Query returned {count[-1]} rows")
-st.dataframe(data, use_container_width=True)
+        if request_builder == "insert":
+            request_builder_query_label = "Enter the rows to insert as json (for single row) or array of jsons (for multiple rows)"
+            placeholder = (
+                value
+            ) = """[{"name":"Wakanda","iso2":"WK"},{"name":"Wadiya","iso2":"WD"}]"""
+            upsert = rcol_placeholder.checkbox(label="Upsert")
+        elif request_builder == "select":
+            request_builder_query_label = "Enter the columns to fetch as comma-separated strings"
+            placeholder = value = "*"
+        elif request_builder == "delete":
+            request_builder_query_label = "Delete query"
+            placeholder = value = "*"
+        elif request_builder == "upsert":
+            # TODO: Add upsert condition
+            pass
+        elif request_builder == "update":
+            # TODO: Add update condition
+            pass
+
+        request_builder_query = st.text_input(
+            label=request_builder_query_label,
+            placeholder=placeholder,
+            value=value,
+            help="[RequestBuilder API reference](https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html#postgrest.AsyncRequestBuilder)",
+            disabled=True if request_builder == "delete" else False,
+        )
+
+        request_builder_query = (
+            '"' + request_builder_query + '"'
+            if request_builder in ["select", "delete"]
+            else request_builder_query
+        )
+        request_builder_query = f'{request_builder_query}, count="{count_method}"'
+        if upsert:
+            request_builder_query = f'{request_builder_query}, upsert="{upsert}"'
+
+        # TODO: Add SelectRequestBuilders
+
+        constructed_query = (
+            f"""supabase.table("{table}").{request_builder}({request_builder_query}).execute()"""
+        )
+        st.write("Constructed query:")
+        st.code(constructed_query)
+    elif st.session_state["project"] == "demo":
+        # TODO: Add demo flow
+        pass
+
+    if st.button("Run query 🏃", use_container_width=True, type="primary"):
+        supabase = st.session_state["client"]
+        data, count = eval(constructed_query)
+        if count_method:
+            st.write(f"{count[-1]} rows {request_builder}ed")
+        st.dataframe(data[-1])
