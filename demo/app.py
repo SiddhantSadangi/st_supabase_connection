@@ -216,7 +216,19 @@ if st.session_state["initialized"]:
 
     if st.button("Run query 🏃", use_container_width=True, type="primary"):
         supabase = st.session_state["client"]
-        data, count = eval(constructed_query)
-        if count_method:
-            st.write(f"{count[-1]} rows {request_builder}ed")
-        st.dataframe(data[-1])
+        try:
+            data, count = eval(constructed_query)
+            if count_method:
+                st.write(f"{count[-1]} rows {request_builder}ed")
+            st.dataframe(data[-1])
+        except Exception as e:
+            if e.__class__.__name__ == "ConnectError":
+                st.error(
+                    "Could not connect. Please check the Supabase URL provided",
+                    icon="❌",
+                )
+            else:
+                st.error(
+                    e,
+                    icon="❌",
+                )
