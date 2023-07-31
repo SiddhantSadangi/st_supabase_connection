@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Tuple, Union
+import contextlib
 
 import streamlit as st
 
@@ -18,11 +18,48 @@ st.set_page_config(
     },
 )
 
-# ---------- SESSION STATE ----------
-upsert = bucket = None
+# ---------- INIT SESSION ----------
+upsert = bucket_id = None
+
+STORAGE_OPERATIONS = [
+    "Create a bucket",
+    "Update bucket",
+    "Delete a bucket",
+    "Empty a bucket",
+    "Upload a file",
+    "Move an existing file",
+    "Delete files in a bucket",
+    "Retrieve a bucket",
+    "List all buckets",
+    "Download a file",
+    "List all files in a bucket",
+    "Create a signed URL",
+    "Retrieve public URL",
+]
+
+RESTRICTED_STORAGE_OPERATORS = [
+    "create_bucket",
+    "update_bucket",
+    "delete_bucket",
+    "empty_bucket",
+    "upload",
+    "move",
+    "remove",
+]
+
+STORAGE_OPERATORS = RESTRICTED_STORAGE_OPERATORS + [
+    "get_bucket",
+    "list_buckets",
+    "download",
+    "list",
+    "create_signed_url",
+    "get_public_url",
+]
 
 if "client" not in st.session_state:
     st.session_state["client"] = None
+else:
+    st_supabase = st.session_state["client"]
 
 if "project" not in st.session_state:
     st.session_state["project"] = "demo"
@@ -35,20 +72,14 @@ with open("demo/sidebar.html", "r", encoding="UTF-8") as sidebar_file:
     sidebar_html = sidebar_file.read().replace("{VERSION}", VERSION)
 
 with st.sidebar:
-    st.info(
-        """
-        API Reference
-        -------------
-        - Database operations: [postgrest-py API reference](https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html)
-        - Storage operations: [Supabase Python client API reference](https://supabase.com/docs/reference/python/storage-createbucket)
-        """,
-    )
     st.components.v1.html(sidebar_html, height=600)
 
 # ---------- MAIN PAGE ----------
 st.header("🔌Streamlit SupabaseConnection Demo")
 
-st.write("📖 Interactive demo for the `st_supabase_connection` Streamlit connection for Supabase.")
+st.write(
+    "📖 Demo for the `st_supabase_connection` Streamlit connection for Supabase Storage and Database."
+)
 
 st.subheader("🏗️ Initialize Connection")
 
@@ -119,24 +150,30 @@ elif project == "My own project":
                     st.session_state["initialized"] = False
 
 st.write("A connection is initialized as")
-st.code(
-    """
-    supabase = st.experimental_connection(
-        name="supabase_connection",
-        type=SupabaseConnection,
-        url=url, # Not required if provided as a Streamlit secret
-        key=key, # Not required if provided as a Streamlit secret
+
+if st.session_state["project"] == "demo":
+    st.code(
+        """
+        st_supabase = st.experimental_connection(
+            name="supabase_connection", type=SupabaseConnection
+            )
+        """,
+        language="python",
     )
-    """,
-    language="python",
-)
+elif st.session_state["project"] == "custom":
+    st.code(
+        """
+        st_supabase = st.experimental_connection(
+            name="supabase_connection", type=SupabaseConnection, url=url, key=key
+            )
+        """,
+        language="python",
+    )
 
 if st.session_state["initialized"]:
     lcol, rcol = st.columns(2)
-    database = lcol.checkbox("Explore database 🔍🗄️")
-    storage = rcol.checkbox("Explore storage 🔍📦")
-
-    if database:
+    storage = lcol.checkbox("Explore storage 🔍📦")
+    if database := rcol.checkbox("Explore database 🔍🗄️"):
         st.subheader("🗄️ Run Database Queries")
 
         if st.session_state["project"] == "custom":
@@ -221,14 +258,12 @@ if st.session_state["initialized"]:
         elif request_builder == "update":
             request_builder_query_label = "Enter the rows to update as json (for single row) or array of jsons (for multiple rows)"
             placeholder = value = """{"iso3":"N/A","continent":"N/A"}"""
-            pass
-
         request_builder_query = st.text_input(
             label=request_builder_query_label,
             placeholder=placeholder,
             value=value,
             help="[RequestBuilder API reference](https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html#postgrest.AsyncRequestBuilder)",
-            disabled=True if request_builder == "delete" else False,
+            disabled=request_builder == "delete",
         )
 
         if request_builder == "upsert" and not ignore_duplicates:
@@ -240,9 +275,7 @@ if st.session_state["initialized"]:
             )
 
         request_builder_query = (
-            '"' + request_builder_query + '"'
-            if request_builder == "select"
-            else request_builder_query
+            f'"{request_builder_query}"' if request_builder == "select" else request_builder_query
         )
         request_builder_query = (
             f'count="{count_method}"'
@@ -261,7 +294,7 @@ if st.session_state["initialized"]:
 
         operators = operators.replace(".__init__()", "").replace(".execute()", "")
 
-        constructed_db_query = f"""supabase.table("{table}").{request_builder}({request_builder_query}){operators}.execute()"""
+        constructed_db_query = f"""st_supabase.table("{table}").{request_builder}({request_builder_query}){operators}.execute()"""
         st.write("Constructed query")
         st.code(constructed_db_query)
 
@@ -276,26 +309,16 @@ if st.session_state["initialized"]:
             "Run query 🏃",
             use_container_width=True,
             type="primary",
-            disabled=True
-            if st.session_state["project"] == "demo"
-            and request_builder in ["insert", "upsert", "update", "delete"]
-            else False,
+            disabled=st.session_state["project"] == "demo"
+            and request_builder in ["insert", "upsert", "update", "delete"],
             help=f"{request_builder.upper()} not allowed in demo project"
             if st.session_state["project"] == "demo"
             and request_builder in ["insert", "upsert", "update", "delete"]
             else None,
             key="run_db_query",
         ):
-            supabase = st.session_state["client"]
             try:
-
-                @st.cache_data
-                def run_db_query(
-                    query: str,
-                ) -> Tuple[List[Dict[str, Any]], Union[int, None]]:
-                    return eval(query)
-
-                data, count = run_db_query(constructed_db_query)
+                data, count = eval(constructed_db_query)
 
                 if count_method:
                     st.write(f"{count[-1]} rows {request_builder}ed")
@@ -347,136 +370,169 @@ if st.session_state["initialized"]:
         lcol, rcol = st.columns(2)
         selected_operation = lcol.selectbox(
             label="Select operation",
-            options=[
-                "Create a bucket",
-                "Retrieve a bucket",
-                "List all buckets",
-                "Delete a bucket",
-                "Empty a bucket",
-                "Upload a file",
-                "Download a file",
-                "List all files in a bucket",
-                "Move an existing file",
-                "Delete files in a bucket",
-                "Create a signed URL",
-                "Retrieve public URL",
-            ],
-            help="[Supabase Storage API reference](https://supabase.com/docs/reference/python/storage-createbucket)",
+            options=STORAGE_OPERATIONS,
+            help="""
+            * [Supabase Storage API reference](https://supabase.com/docs/reference/python/storage-createbucket)
+            * [storage-py API reference](https://supabase-community.github.io/storage-py/api/index.html)""",
         )
 
-        operation_query_dict = {
-            "Create a bucket": "create_bucket",
-            "Retrieve a bucket": "get_bucket",
-            "List all buckets": "list_buckets",
-            "Delete a bucket": "delete_bucket",
-            "Empty a bucket": "empty_bucket",
-            "Upload a file": "upload",
-            "Download a file": "download",
-            "List all files in a bucket": "list",
-            "Move an existing file": "move",
-            "Delete files in a bucket": "remove",
-            "Create a signed URL": "create_signed_url",
-            "Retrieve public URL": "get_public_url",
-        }
+        operation_query_dict = dict(zip(STORAGE_OPERATIONS, STORAGE_OPERATORS))
 
         operation = operation_query_dict.get(selected_operation)
 
-        bucket = rcol.text_input(
-            "Enter the bucket name",
-            value="my_bucket",
-            placeholder="my_bucket",
-            disabled=True if operation == "list_buckets" else False,
+        bucket_id = rcol.text_input(
+            "Enter the bucket id",
+            placeholder="my_bucket" if operation != "update_bucket" else "",
+            disabled=operation == "list_buckets",
+            help="The unique identifier for the bucket",
         )
 
-        if operation == "upload":
+        if operation in ["delete_bucket", "empty_bucket", "get_bucket"]:
+            constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}")"""
+
+        elif operation == "create_bucket":
+            col1, col2, col3, col4 = st.columns(4)
+
+            name = col1.text_input(
+                "Bucket name",
+                placeholder=bucket_id,
+                help="The name of the bucket. Defaults to bucket id",
+            )
+
+            file_size_limit = col2.number_input(
+                "Bucket file size limit",
+                min_value=0,
+                value=0,
+                help="Size limit of the files that can be uploaded to the bucket (in bytes). `0` means no limit.",
+            )
+
+            allowed_mime_types = col3.text_area(
+                "Allowed MIME types",
+                placeholder="['text/plain','image/jpg']",
+                help="The MIME types that can be uploaded to the bucket. Enter as a list. Defaults to `None` to allow all file types.",
+            )
+            allowed_mime_types = None if len(allowed_mime_types) == 0 else allowed_mime_types
+
+            public = col4.checkbox(
+                "Public",
+                help="Whether the bucket should be publicly accessible?",
+                value=False,
+            )
+
+            constructed_storage_query = f"""st_supabase.create_bucket('{bucket_id}',{name=},{file_size_limit=},allowed_mime_types={allowed_mime_types},{public=})"""
+
+        elif operation == "update_bucket":
+            if bucket_id:
+                current_props = st_supabase.get_bucket(bucket_id)
+                st.info("Current properties fetched. Update values to update properties.")
+                col1, col2, col3 = st.columns(3)
+
+                file_size_limit = col1.number_input(
+                    "New file size limit",
+                    min_value=0,
+                    value=current_props.file_size_limit or 0,
+                    help="Set as `0` to have no limit",
+                )
+                file_size_limit = None if file_size_limit == 0 else file_size_limit
+
+                allowed_mime_types = col2.text_area(
+                    "New allowed MIME types",
+                    value=""
+                    if current_props.allowed_mime_types
+                    else current_props.allowed_mime_types,
+                    help="Enter as a list. Set `None` to allow all MIME types.",
+                )
+
+                public = col3.checkbox(
+                    "Public",
+                    help="Whether the bucket should be publicly accessible?",
+                    value=current_props.public,
+                )
+
+                constructed_storage_query = f"""st_supabase.{operation}('{bucket_id}',{file_size_limit=},allowed_mime_types={allowed_mime_types},{public=})"""
+
+        elif operation == "upload":
             uploaded_file = st.file_uploader("Choose a file")
             destination_path = st.text_input(
                 "Enter destination path in the bucket",
                 placeholder="/parentFolder/subFolder/file.txt",
             )
-            if uploaded_file and destination_path:
-                # TODO: Update constructed storage query for file upload
-                with open(uploaded_file.name, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
-                with open(uploaded_file.name, "rb") as f:
-                    res = (
-                        st.session_state["client"]
-                        .storage.from_(bucket)
-                        .upload(
-                            destination_path,
-                            f,
-                            file_options={"content-type": uploaded_file.type},
-                        )
-                    )
+
+            constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}", file={uploaded_file}, destination_path="{destination_path}")"""
+
+        elif operation == "list_buckets":
+            constructed_storage_query = f"""st_supabase.{operation}()"""
+
+        elif operation == "download":
+            source_path = st.text_input(
+                "Enter source path in the bucket",
+                placeholder="folder/subFolder/file.txt",
+            )
+
+            constructed_storage_query = (
+                f"""st_supabase.{operation}("{bucket_id}", {source_path=})"""
+            )
+
+        if operation == "download":
+            st.write("Constructed query")
+            st.code(
+                f"file_name, mime, data = {constructed_storage_query}",
+                language="python",
+            )
+        elif not (operation == "update_bucket" and not bucket_id):
+            st.write("Constructed query")
+            st.code(constructed_storage_query, language="python")
+
         if operation == "list_buckets":
-            constructed_storage_query = f"""supabase.storage.{operation}()"""
+            disabled = False
+        elif (
+            st.session_state["project"] == "demo" and operation in RESTRICTED_STORAGE_OPERATORS
+        ) or not bucket_id:
+            disabled = True
         else:
-            constructed_storage_query = f"""supabase.storage.{operation}("{bucket}")"""
-        st.write("Constructed query")
-        st.code(constructed_storage_query, language="python")
+            disabled = False
 
         if st.button(
             "Run query 🏃",
             use_container_width=True,
             type="primary",
-            disabled=True
-            if st.session_state["project"] == "demo"
-            and operation
-            in [
-                "create_bucket",
-                "delete_bucket",
-                "empty_bucket",
-                "upload",
-                "move",
-                "remove",
-            ]
-            else False,
+            disabled=disabled,
             help=f"'{selected_operation.capitalize()}' not allowed in demo project"
-            if st.session_state["project"] == "demo"
-            and operation
-            in [
-                "create_bucket",
-                "delete_bucket",
-                "empty_bucket",
-                "upload",
-                "move",
-                "remove",
-            ]
+            if st.session_state["project"] == "demo" and operation in RESTRICTED_STORAGE_OPERATORS
             else None,
             key="run_storage_query",
         ):
-            supabase = st.session_state["client"]
-
-            @st.cache_resource
-            def run_storage_query(
-                query: str,
-            ):
-                return eval(query)
-
-            if operation in [
-                "create_bucket",
-                "delete_bucket",
-                "empty_bucket",
-                "upload",
-                "move",
-                "remove",
-            ]:
-                run_storage_query.clear()
-
             try:
-                res = run_storage_query(constructed_storage_query)
-                try:
-                    if operation == "create_bucket" and res["name"] == bucket:
+                if operation == "upload":
+                    res = st_supabase.upload(bucket_id, uploaded_file, destination_path)
+                elif operation == "download":
+                    file_name, mime, data = eval(constructed_storage_query)
+                    st.write(file_name, mime)
+                    st.download_button(
+                        "Download file ⏬",
+                        data=data,
+                        file_name=file_name,
+                        mime=mime,
+                        use_container_width=True,
+                    )
+                else:
+                    res = eval(constructed_storage_query)
+                with contextlib.suppress(TypeError, NameError):
+                    if operation == "create_bucket" and res["name"] == bucket_id:
                         st.success("Bucket created", icon="✅")
+                    elif operation == "update_bucket" and res["message"] == "Successfully updated":
+                        st.success("Bucket updated", icon="✅")
                     elif operation == "delete_bucket" and res["message"] == "Successfully deleted":
                         st.success("Bucket deleted", icon="✅")
                     elif operation == "empty_bucket" and res["message"] == "Successfully emptied":
                         st.success("Bucket emptied", icon="✅")
-
+                    elif operation == "upload" and res["Key"] == f"{bucket_id}/{destination_path}":
+                        st.success(
+                            f"__{uploaded_file.name}__ uploaded to __{res['Key']}__",
+                            icon="✅",
+                        )
                     else:
                         st.write(res)
-                except TypeError:
-                    pass
             except Exception as e:
                 if e.__class__.__name__ == "ConnectError":
                     st.error(
@@ -488,5 +544,3 @@ if st.session_state["initialized"]:
                         e,
                         icon="❌",
                     )
-
-# TODO: Check if convenience methods can be added to connector (for example, upload)
