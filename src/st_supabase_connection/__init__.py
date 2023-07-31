@@ -3,14 +3,14 @@ from io import BytesIO
 from typing import Optional, Union
 
 from streamlit.connections import ExperimentalBaseConnection
-from supabase import create_client
+from supabase import Client, create_client
 
 # TODO: Update demo app
 # TODO: Update README (highlight benefits 1. same methods as the supabase API 2. built on postgrest-py and storage3, the backend behnd the supaabse API
 # 3. less code when using upload and download)
 # TODO: Add docstrings and example usage
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 
 
 class SupabaseConnection(ExperimentalBaseConnection[Client]):
