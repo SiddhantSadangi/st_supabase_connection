@@ -353,17 +353,12 @@ if st.session_state["initialized"]:
             )
         elif st.session_state["project"] == "demo":
             st.write("Demo storage schema")
-            # TODO: UPDATE
             st.markdown(
                 """
-                | Table | Columns | Size
-                |---|---|---
-                |`cities`| `id`, `country_id`, `name` | 2
-                |`countries`| `id`, `name`, `iso2`, `iso3`, `local_name`, `continent` | 249
-                |`messages`| `sender_id`, `receiver_id`, `content` | 2
-                |`teams`| `id`, `name` | 2
-                |`users`| `id`, `name` | 2
-                |`users_teams`| `user_id`, `team_id` | 3
+                bucket | object
+                |---|---
+                `bucket1`| `/awesome_zoom_background.jpg`
+                `bucket2`| `/folder1/folder2/lenna.png`
                 """
             )
 
@@ -405,6 +400,7 @@ if st.session_state["initialized"]:
                 value=0,
                 help="Size limit of the files that can be uploaded to the bucket (in bytes). `0` means no limit.",
             )
+            file_size_limit = None if file_size_limit == 0 else file_size_limit
 
             allowed_mime_types = col3.text_area(
                 "Allowed MIME types",
@@ -466,13 +462,14 @@ if st.session_state["initialized"]:
         elif operation == "download":
             source_path = st.text_input(
                 "Enter source path in the bucket",
-                placeholder="folder/subFolder/file.txt",
+                placeholder="/folder/subFolder/file.txt",
             )
 
             constructed_storage_query = (
                 f"""st_supabase.{operation}("{bucket_id}", {source_path=})"""
             )
 
+        # TODO: move, remove, list, create_signed_url, get_public_url
         if operation == "download":
             st.write("Constructed query")
             st.code(
@@ -507,7 +504,7 @@ if st.session_state["initialized"]:
                     res = st_supabase.upload(bucket_id, uploaded_file, destination_path)
                 elif operation == "download":
                     file_name, mime, data = eval(constructed_storage_query)
-                    st.write(file_name, mime)
+                    st.success("Download ready 🎉🎉🎉")
                     st.download_button(
                         "Download file ⏬",
                         data=data,
