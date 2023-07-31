@@ -19,7 +19,7 @@ st.set_page_config(
 )
 
 # ---------- SESSION STATE ----------
-upsert = None
+upsert = bucket = None
 
 if "client" not in st.session_state:
     st.session_state["client"] = None
@@ -53,7 +53,7 @@ st.write("📖 Interactive demo for the `st_supabase_connection` Streamlit conne
 st.subheader("🏗️ Initialize Connection")
 
 project = st.radio(
-    label="Select Supabase project (demo project recommended for Supabase beginners)",
+    label="Select Supabase project",
     options=[
         "Demo project",
         "My own project",
@@ -64,7 +64,7 @@ project = st.radio(
 if project == "Demo project":
     st.session_state["project"] = "demo"
     st.warning(
-        "DML operations (INSERT, UPSERT, UPDATE, DELETE) not allowed",
+        "Limited data and operations",
         icon="⚠️",
     )
     if st.button(
@@ -93,7 +93,7 @@ elif project == "My own project":
         expanded=not st.session_state["initialized"],
     ):
         with st.form(key="credentials"):
-            url = st.text_input("Enter Supabase URL", type="password")
+            url = st.text_input("Enter Supabase URL")
             key = st.text_input("Enter Supabase key", type="password")
 
             if st.form_submit_button(
@@ -108,6 +108,7 @@ elif project == "My own project":
                         url=url,
                         key=key,
                     )
+                    st.success("Client initialized!", icon="✅")
                     st.session_state["initialized"] = True
                 except Exception as e:
                     st.error(
@@ -117,7 +118,7 @@ elif project == "My own project":
                     )
                     st.session_state["initialized"] = False
 
-st.write("A connection will be initialized as:")
+st.write("A connection is initialized as")
 st.code(
     """
     supabase = st.experimental_connection(
@@ -131,20 +132,51 @@ st.code(
 )
 
 if st.session_state["initialized"]:
-    st.success("Client initialized!", icon="✅")
+    lcol, rcol = st.columns(2)
+    database = lcol.checkbox("Explore database 🔍🗄️")
+    storage = rcol.checkbox("Explore storage 🔍📦")
 
-    st.subheader("🗄️ Run Database Queries")
-    with st.expander(label="🗄️ Database Section", expanded=True):
-        # if st.session_state["project"] == "custom":
-        st.warning(
-            "You are using your own project. Be careful while running DML queries!",
-            icon="ℹ️",
-        )
-        table = st.text_input(
-            "Enter the table name",
-            value="countries",
-            placeholder="countries",
-        )
+    if database:
+        st.subheader("🗄️ Run Database Queries")
+
+        if st.session_state["project"] == "custom":
+            st.warning(
+                "You are using your own project. Be careful while running DML queries!",
+                icon="ℹ️",
+            )
+        elif st.session_state["project"] == "demo":
+            st.write("Demo database schema")
+            st.markdown(
+                """
+                | Table | Columns | Size
+                |---|---|---
+                |`cities`| `id`, `country_id`, `name` | 2
+                |`countries`| `id`, `name`, `iso2`, `iso3`, `local_name`, `continent` | 249
+                |`messages`| `sender_id`, `receiver_id`, `content` | 2
+                |`teams`| `id`, `name` | 2
+                |`users`| `id`, `name` | 2
+                |`users_teams`| `user_id`, `team_id` | 3
+                """
+            )
+        if st.session_state["project"] == "demo":
+            table = st.selectbox(
+                "Select the table name",
+                options=[
+                    "cities",
+                    "countries",
+                    "messages",
+                    "teams",
+                    "users",
+                    "users_teams",
+                ],
+                index=1,
+            )
+        elif st.session_state["project"] == "custom":
+            table = st.text_input(
+                "Enter the table name",
+                value="countries",
+                placeholder="countries",
+            )
 
         lcol, mcol, rcol = st.columns(3)
         request_builder = lcol.selectbox(
@@ -227,9 +259,11 @@ if st.session_state["initialized"]:
             help="List of all available [operators](https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html#postgrest.AsyncSelectRequestBuilder) and [filters](https://postgrest-py.readthedocs.io/en/latest/api/filters.html#postgrest.AsyncFilterRequestBuilder)",
         )
 
-        constructed_query = f"""supabase.table("{table}").{request_builder}({request_builder_query}){operators}.execute()"""
-        st.write("Constructed query:")
-        st.code(constructed_query)
+        operators = operators.replace(".__init__()", "").replace(".execute()", "")
+
+        constructed_db_query = f"""supabase.table("{table}").{request_builder}({request_builder_query}){operators}.execute()"""
+        st.write("Constructed query")
+        st.code(constructed_db_query)
 
         lcol, rcol = st.columns([2, 1])
         view = lcol.radio(
@@ -250,15 +284,18 @@ if st.session_state["initialized"]:
             if st.session_state["project"] == "demo"
             and request_builder in ["insert", "upsert", "update", "delete"]
             else None,
+            key="run_db_query",
         ):
             supabase = st.session_state["client"]
             try:
 
                 @st.cache_data
-                def run_query(query: str) -> Tuple[List[Dict[str, Any]], Union[int, None]]:
+                def run_db_query(
+                    query: str,
+                ) -> Tuple[List[Dict[str, Any]], Union[int, None]]:
                     return eval(query)
 
-                data, count = run_query(constructed_query)
+                data, count = run_db_query(constructed_db_query)
 
                 if count_method:
                     st.write(f"{count[-1]} rows {request_builder}ed")
@@ -283,7 +320,173 @@ if st.session_state["initialized"]:
                         icon="❌",
                     )
 
-    st.subheader("📦 Run Storage Queries")
-    with st.expander("📦 Storage section"):
-        # TODO: Add storage queries
-        pass
+    if storage:
+        st.subheader("📦 Run Storage Queries")
+
+        if st.session_state["project"] == "custom":
+            st.warning(
+                "You are using your own project. Be careful while running delete, empty, and move requests!",
+                icon="ℹ️",
+            )
+        elif st.session_state["project"] == "demo":
+            st.write("Demo storage schema")
+            # TODO: UPDATE
+            st.markdown(
+                """
+                | Table | Columns | Size
+                |---|---|---
+                |`cities`| `id`, `country_id`, `name` | 2
+                |`countries`| `id`, `name`, `iso2`, `iso3`, `local_name`, `continent` | 249
+                |`messages`| `sender_id`, `receiver_id`, `content` | 2
+                |`teams`| `id`, `name` | 2
+                |`users`| `id`, `name` | 2
+                |`users_teams`| `user_id`, `team_id` | 3
+                """
+            )
+
+        lcol, rcol = st.columns(2)
+        selected_operation = lcol.selectbox(
+            label="Select operation",
+            options=[
+                "Create a bucket",
+                "Retrieve a bucket",
+                "List all buckets",
+                "Delete a bucket",
+                "Empty a bucket",
+                "Upload a file",
+                "Download a file",
+                "List all files in a bucket",
+                "Move an existing file",
+                "Delete files in a bucket",
+                "Create a signed URL",
+                "Retrieve public URL",
+            ],
+            help="[Supabase Storage API reference](https://supabase.com/docs/reference/python/storage-createbucket)",
+        )
+
+        operation_query_dict = {
+            "Create a bucket": "create_bucket",
+            "Retrieve a bucket": "get_bucket",
+            "List all buckets": "list_buckets",
+            "Delete a bucket": "delete_bucket",
+            "Empty a bucket": "empty_bucket",
+            "Upload a file": "upload",
+            "Download a file": "download",
+            "List all files in a bucket": "list",
+            "Move an existing file": "move",
+            "Delete files in a bucket": "remove",
+            "Create a signed URL": "create_signed_url",
+            "Retrieve public URL": "get_public_url",
+        }
+
+        operation = operation_query_dict.get(selected_operation)
+
+        bucket = rcol.text_input(
+            "Enter the bucket name",
+            value="my_bucket",
+            placeholder="my_bucket",
+            disabled=True if operation == "list_buckets" else False,
+        )
+
+        if operation == "upload":
+            uploaded_file = st.file_uploader("Choose a file")
+            destination_path = st.text_input(
+                "Enter destination path in the bucket",
+                placeholder="/parentFolder/subFolder/file.txt",
+            )
+            if uploaded_file and destination_path:
+                # TODO: Update constructed storage query for file upload
+                with open(uploaded_file.name, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                with open(uploaded_file.name, "rb") as f:
+                    res = (
+                        st.session_state["client"]
+                        .storage.from_(bucket)
+                        .upload(
+                            destination_path,
+                            f,
+                            file_options={"content-type": uploaded_file.type},
+                        )
+                    )
+        if operation == "list_buckets":
+            constructed_storage_query = f"""supabase.storage.{operation}()"""
+        else:
+            constructed_storage_query = f"""supabase.storage.{operation}("{bucket}")"""
+        st.write("Constructed query")
+        st.code(constructed_storage_query, language="python")
+
+        if st.button(
+            "Run query 🏃",
+            use_container_width=True,
+            type="primary",
+            disabled=True
+            if st.session_state["project"] == "demo"
+            and operation
+            in [
+                "create_bucket",
+                "delete_bucket",
+                "empty_bucket",
+                "upload",
+                "move",
+                "remove",
+            ]
+            else False,
+            help=f"'{selected_operation.capitalize()}' not allowed in demo project"
+            if st.session_state["project"] == "demo"
+            and operation
+            in [
+                "create_bucket",
+                "delete_bucket",
+                "empty_bucket",
+                "upload",
+                "move",
+                "remove",
+            ]
+            else None,
+            key="run_storage_query",
+        ):
+            supabase = st.session_state["client"]
+
+            @st.cache_resource
+            def run_storage_query(
+                query: str,
+            ):
+                return eval(query)
+
+            if operation in [
+                "create_bucket",
+                "delete_bucket",
+                "empty_bucket",
+                "upload",
+                "move",
+                "remove",
+            ]:
+                run_storage_query.clear()
+
+            try:
+                res = run_storage_query(constructed_storage_query)
+                try:
+                    if operation == "create_bucket" and res["name"] == bucket:
+                        st.success("Bucket created", icon="✅")
+                    elif operation == "delete_bucket" and res["message"] == "Successfully deleted":
+                        st.success("Bucket deleted", icon="✅")
+                    elif operation == "empty_bucket" and res["message"] == "Successfully emptied":
+                        st.success("Bucket emptied", icon="✅")
+
+                    else:
+                        st.write(res)
+                except TypeError:
+                    pass
+            except Exception as e:
+                if e.__class__.__name__ == "ConnectError":
+                    st.error(
+                        "Could not connect. Please check the Supabase URL provided",
+                        icon="❌",
+                    )
+                else:
+                    st.error(
+                        e,
+                        icon="❌",
+                    )
+
+# TODO: Check if convenience methods can be added to connector (for example, upload)
