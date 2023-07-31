@@ -1,2 +1,2 @@
-st_supabase_connection == 0.0.0
+st_supabase_connection == 0.0.1
 streamlit

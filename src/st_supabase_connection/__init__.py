@@ -10,7 +10,7 @@ from supabase import create_client
 # 3. less code when using upload and download)
 # TODO: Add docstrings and example usage
 
-__version__ = "0.0.0"
+__version__ = "0.0.1"
 
 
 class SupabaseConnection(ExperimentalBaseConnection[Client]):
