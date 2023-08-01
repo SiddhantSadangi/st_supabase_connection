@@ -19,7 +19,8 @@ st.set_page_config(
 )
 
 # ---------- INIT SESSION ----------
-upsert = bucket_id = None
+upsert = bucket_id = file_size_limit = allowed_mime_types = None
+public = False
 
 STORAGE_OPERATIONS = [
     "Create a bucket",
@@ -29,11 +30,13 @@ STORAGE_OPERATIONS = [
     "Upload a file",
     "Move an existing file",
     "Delete files in a bucket",
+    "Create a signed upload URL",
+    "Upload to signed URL",
     "Retrieve a bucket",
     "List all buckets",
     "Download a file",
     "List all files in a bucket",
-    "Create a signed URL",
+    "Create signed URLs",
     "Retrieve public URL",
 ]
 
@@ -45,14 +48,16 @@ RESTRICTED_STORAGE_OPERATORS = [
     "upload",
     "move",
     "remove",
+    "create_signed_upload_url",
+    "upload_to_signed_url",
 ]
 
 STORAGE_OPERATORS = RESTRICTED_STORAGE_OPERATORS + [
     "get_bucket",
     "list_buckets",
     "download",
-    "list",
-    "create_signed_url",
+    "list_objects",
+    "create_signed_urls",
     "get_public_url",
 ]
 
@@ -66,6 +71,9 @@ if "project" not in st.session_state:
 
 if "initialized" not in st.session_state:
     st.session_state["initialized"] = False
+
+if "storage_disabled" not in st.session_state:
+    st.session_state["storage_disabled"] = True
 
 # ---------- SIDEBAR ----------
 with open("demo/sidebar.html", "r", encoding="UTF-8") as sidebar_file:
@@ -139,7 +147,6 @@ elif project == "My own project":
                         url=url,
                         key=key,
                     )
-                    st.success("Client initialized!", icon="✅")
                     st.session_state["initialized"] = True
                 except Exception as e:
                     st.error(
@@ -148,6 +155,9 @@ elif project == "My own project":
                         icon="❌",
                     )
                     st.session_state["initialized"] = False
+
+if st.session_state["initialized"]:
+    st.success("Client initialized!", icon="✅")
 
 st.write("A connection is initialized as")
 
@@ -173,7 +183,9 @@ elif st.session_state["project"] == "custom":
 if st.session_state["initialized"]:
     lcol, rcol = st.columns(2)
     storage = lcol.checkbox("Explore storage 🔍📦")
-    if database := rcol.checkbox("Explore database 🔍🗄️"):
+    database = rcol.checkbox("Explore database 🔍🗄️")
+
+    if database:
         st.subheader("🗄️ Run Database Queries")
 
         if st.session_state["project"] == "custom":
@@ -384,6 +396,7 @@ if st.session_state["initialized"]:
 
         if operation in ["delete_bucket", "empty_bucket", "get_bucket"]:
             constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}")"""
+            st.session_state["storage_disabled"] = False if bucket_id else True
 
         elif operation == "create_bucket":
             col1, col2, col3, col4 = st.columns(4)
@@ -416,36 +429,44 @@ if st.session_state["initialized"]:
             )
 
             constructed_storage_query = f"""st_supabase.create_bucket('{bucket_id}',{name=},{file_size_limit=},allowed_mime_types={allowed_mime_types},{public=})"""
+            st.session_state["storage_disabled"] = False if bucket_id else True
 
         elif operation == "update_bucket":
             if bucket_id:
-                current_props = st_supabase.get_bucket(bucket_id)
-                st.info("Current properties fetched. Update values to update properties.")
-                col1, col2, col3 = st.columns(3)
+                try:
+                    current_props = st_supabase.get_bucket(bucket_id)
 
-                file_size_limit = col1.number_input(
-                    "New file size limit",
-                    min_value=0,
-                    value=current_props.file_size_limit or 0,
-                    help="Set as `0` to have no limit",
-                )
-                file_size_limit = None if file_size_limit == 0 else file_size_limit
+                    st.info("Current properties fetched. Update values to update properties.")
+                    col1, col2, col3 = st.columns(3)
 
-                allowed_mime_types = col2.text_area(
-                    "New allowed MIME types",
-                    value=""
-                    if current_props.allowed_mime_types
-                    else current_props.allowed_mime_types,
-                    help="Enter as a list. Set `None` to allow all MIME types.",
-                )
+                    file_size_limit = col1.number_input(
+                        "New file size limit",
+                        min_value=0,
+                        value=current_props.file_size_limit or 0,
+                        help="Set as `0` to have no limit",
+                    )
+                    file_size_limit = None if file_size_limit == 0 else file_size_limit
 
-                public = col3.checkbox(
-                    "Public",
-                    help="Whether the bucket should be publicly accessible?",
-                    value=current_props.public,
-                )
+                    allowed_mime_types = col2.text_area(
+                        "New allowed MIME types",
+                        value=current_props.allowed_mime_types or "",
+                        help="Enter as a list. Set `None` to allow all MIME types.",
+                    )
 
-                constructed_storage_query = f"""st_supabase.{operation}('{bucket_id}',{file_size_limit=},allowed_mime_types={allowed_mime_types},{public=})"""
+                    public = col3.checkbox(
+                        "Public",
+                        help="Whether the bucket should be publicly accessible?",
+                        value=current_props.public,
+                    )
+                    st.session_state["storage_disabled"] = False
+                except Exception as e:
+                    if e.__class__.__name__ == "StorageException":
+                        st.error(f"Bucket with id **{bucket_id}** not found", icon="❌")
+                    else:
+                        st.write(e)
+                    st.session_state["storage_disabled"] = True
+
+            constructed_storage_query = f"""st_supabase.{operation}('{bucket_id}',{file_size_limit=},allowed_mime_types={allowed_mime_types},{public=})"""
 
         elif operation == "upload":
             uploaded_file = st.file_uploader("Choose a file")
@@ -455,6 +476,9 @@ if st.session_state["initialized"]:
             )
 
             constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}", file={uploaded_file}, destination_path="{destination_path}")"""
+            st.session_state["storage_disabled"] = (
+                False if all([bucket_id, uploaded_file, destination_path]) else True
+            )
 
         elif operation == "list_buckets":
             constructed_storage_query = f"""st_supabase.{operation}()"""
@@ -468,40 +492,131 @@ if st.session_state["initialized"]:
             constructed_storage_query = (
                 f"""st_supabase.{operation}("{bucket_id}", {source_path=})"""
             )
+        elif operation == "move":
+            from_path = st.text_input(
+                "Enter source path in the bucket",
+                placeholder="/folder/subFolder/file.txt",
+            )
+            to_path = st.text_input(
+                "Enter destination path in the bucket",
+                placeholder="/folder/subFolder/file.txt",
+                help="Path will be created if it does not exist",
+            )
+            constructed_storage_query = (
+                f"""st_supabase.{operation}("{bucket_id}", {from_path=}, {to_path=})"""
+            )
 
-        # TODO: move, remove, list, create_signed_url, get_public_url
+            st.session_state["storage_disabled"] = (
+                False if all([bucket_id, from_path, to_path]) else True
+            )
+        elif operation == "remove":
+            paths = st.text_input(
+                "Enter the paths of the objects in the bucket to remove",
+                placeholder="""["image.png","/folder/subFolder/file.txt"]""",
+                help="Enter as a list",
+            )
+            constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}", paths={paths})"""
+
+            st.session_state["storage_disabled"] = False if all([bucket_id, paths]) else True
+        elif operation == "list_objects":
+            path = st.text_input(
+                "Enter the folder path to list objects from",
+                placeholder="/folder/subFolder/",
+            )
+
+            col1, col2, col3, col4 = st.columns(4)
+
+            limit = col1.number_input(
+                "Number of objects to list",
+                min_value=1,
+                value=100,
+            )
+
+            offset = col2.number_input(
+                "Offset",
+                min_value=0,
+                value=0,
+            )
+
+            sortby = col3.selectbox(
+                "Select the column to sort by",
+                options=["name", "updated_at", "created_at", "last_accessed_at"],
+                index=0,
+            )
+
+            order = col4.radio(
+                "Select the sorting order",
+                options=["asc", "desc"],
+                index=0,
+                horizontal=True,
+            )
+
+            constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}", {path=}, {limit=}, {offset=}, {sortby=}, {order=})"""
+
+            st.session_state["storage_disabled"] = False if bucket_id else True
+        elif operation == "get_public_url":
+            filepath = st.text_input(
+                "Enter the path to file",
+                placeholder="/folder/subFolder/image.jpg",
+            )
+
+            constructed_storage_query = f"""st_supabase.get_public_url("{bucket_id}",{filepath=})"""
+            st.session_state["storage_disabled"] = False if all([bucket_id, filepath]) else True
+        elif operation == "create_signed_urls":
+            lcol, rcol = st.columns([2, 1])
+            paths = lcol.text_input(
+                "Enter the list of paths to the files",
+                placeholder="['/folder/subFolder/image.jpg','file.txt']",
+            )
+
+            expires_in = rcol.number_input(
+                "Seconds until the signed URL expires",
+                min_value=0,
+                value=3600,
+            )
+
+            constructed_storage_query = (
+                f"""st_supabase.create_signed_urls("{bucket_id}",paths={paths}, {expires_in=})"""
+            )
+            st.session_state["storage_disabled"] = (
+                False if all([bucket_id, paths, expires_in]) else True
+            )
+
+        # TODO: create_signed_upload_url, upload_to_signed_url,
         if operation == "download":
-            st.write("Constructed query")
+            st.write("Constructed statement")
             st.code(
                 f"file_name, mime, data = {constructed_storage_query}",
                 language="python",
             )
-        elif not (operation == "update_bucket" and not bucket_id):
-            st.write("Constructed query")
+        else:
+            st.write("Constructed statement")
             st.code(constructed_storage_query, language="python")
 
-        if operation == "list_buckets":
-            disabled = False
-        elif (
-            st.session_state["project"] == "demo" and operation in RESTRICTED_STORAGE_OPERATORS
-        ) or not bucket_id:
-            disabled = True
+        st.session_state["storage_disabled"] = (
+            True
+            if st.session_state["project"] == "demo" and operation in RESTRICTED_STORAGE_OPERATORS
+            else st.session_state["storage_disabled"]
+        )
+
+        if st.session_state["storage_disabled"]:
+            help = "A required input is missing"
+        elif st.session_state["project"] == "demo" and operation in RESTRICTED_STORAGE_OPERATORS:
+            help = f"'{selected_operation.capitalize()}' not allowed in demo project"
         else:
-            disabled = False
+            help = None
 
         if st.button(
             "Run query 🏃",
             use_container_width=True,
             type="primary",
-            disabled=disabled,
-            help=f"'{selected_operation.capitalize()}' not allowed in demo project"
-            if st.session_state["project"] == "demo" and operation in RESTRICTED_STORAGE_OPERATORS
-            else None,
+            disabled=st.session_state["storage_disabled"],
+            help=help,
             key="run_storage_query",
         ):
             try:
                 if operation == "upload":
-                    res = st_supabase.upload(bucket_id, uploaded_file, destination_path)
+                    response = st_supabase.upload(bucket_id, uploaded_file, destination_path)
                 elif operation == "download":
                     file_name, mime, data = eval(constructed_storage_query)
                     st.success("Download ready 🎉🎉🎉")
@@ -513,23 +628,56 @@ if st.session_state["initialized"]:
                         use_container_width=True,
                     )
                 else:
-                    res = eval(constructed_storage_query)
+                    response = eval(constructed_storage_query)
                 with contextlib.suppress(TypeError, NameError):
-                    if operation == "create_bucket" and res["name"] == bucket_id:
-                        st.success("Bucket created", icon="✅")
-                    elif operation == "update_bucket" and res["message"] == "Successfully updated":
-                        st.success("Bucket updated", icon="✅")
-                    elif operation == "delete_bucket" and res["message"] == "Successfully deleted":
-                        st.success("Bucket deleted", icon="✅")
-                    elif operation == "empty_bucket" and res["message"] == "Successfully emptied":
-                        st.success("Bucket emptied", icon="✅")
-                    elif operation == "upload" and res["Key"] == f"{bucket_id}/{destination_path}":
+                    if operation == "create_bucket" and response["name"] == bucket_id:
+                        st.success(f"Bucket **{bucket_id}** created", icon="✅")
+                    elif (
+                        operation == "update_bucket"
+                        and response["message"] == "Successfully updated"
+                    ):
+                        st.success(f"Bucket **{bucket_id}** updated", icon="✅")
+                    elif (
+                        operation == "delete_bucket"
+                        and response["message"] == "Successfully deleted"
+                    ):
+                        st.success(f"Bucket **{bucket_id}** deleted", icon="✅")
+                    elif (
+                        operation == "empty_bucket"
+                        and response["message"] == "Successfully emptied"
+                    ):
+                        st.success(f"Bucket **{bucket_id}**  emptied", icon="✅")
+                    elif operation == "move" and response["message"] == "Successfully moved":
                         st.success(
-                            f"__{uploaded_file.name}__ uploaded to __{res['Key']}__",
+                            f"Moved **{bucket_id}/{from_path}** to **{bucket_id}/{to_path}**",
                             icon="✅",
                         )
+                    elif (
+                        operation == "upload"
+                        and response["Key"] == f"{bucket_id}/{destination_path}"
+                    ):
+                        st.success(
+                            f"Uploaded **{uploaded_file.name}** to **{response['Key']}**",
+                            icon="✅",
+                        )
+                    elif operation == "remove":
+                        st.info(f"Removed **{len(response)}** objects")
+                        st.write(response)
+                    elif operation == "list_objects":
+                        st.info(f"Listing **{len(response)}** objects")
+                        st.write(response)
+                    elif operation == "get_public_url":
+                        st.success(response, icon="🔗")
+                    elif operation == "create_signed_urls":
+                        st.warning(f"These URLs are valid only for {expires_in} seconds", icon="⚠️")
+                        for items in response:
+                            st.write(f"**File:** {items['path']}")
+                            if items["signedURL"]:
+                                st.success(items["signedURL"], icon="🔗")
+                            else:
+                                st.error(items["error"], icon="❌")
                     else:
-                        st.write(res)
+                        st.write(response)
             except Exception as e:
                 if e.__class__.__name__ == "ConnectError":
                     st.error(
