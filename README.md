@@ -6,7 +6,7 @@ A Streamlit connection component to connect Streamlit to Supabase Storage and Da
 - [X] **Same method names as the Supabase Python API**
 - [X] It is built on top of [`storage-py`](https://github.com/supabase-community/storage-py) and **exposes more methods** than currently supported by the Supabase Python API. For example, `update()`, `create_signed_upload_url()`, and `upload_to_signed_url()`
 - [X] **Consistent logging syntax.** All statements follow the syntax `client.method("bucket_id", **options)`
-- [X] **Less keystrokes required** when integrating with your Streamlit app. For example, uploading a file to Supabase storage
+- [X] **Less keystrokes required** when integrating with your Streamlit app.
 
   <details open>
   <summary>Examples with and without the connector </summary>
