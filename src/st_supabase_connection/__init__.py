@@ -24,7 +24,7 @@ __version__ = "0.0.2"
 
 class SupabaseConnection(ExperimentalBaseConnection[Client]):
     """
-    Connects a streamlit app to Supabase
+    Connects a streamlit app to Supabase Storage and Database
 
     Attributes
     ----------
@@ -37,6 +37,36 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
     -------
     table :
         Perform a table operation
+    get_bucket :
+        Retrieve a bucket
+    list_buckets :
+        List all buckets
+    delete_bucket :
+        Delete a bucket
+    empty_bucket :
+        Empty a bucket
+    create_bucket :
+        Create a bucket
+    upload :
+        Upload files to a bucket
+    download :
+        Download files from a bucket
+    update_bucket :
+        Update bucket properties
+    move :
+        Move objects within a bucket
+    remove :
+        Removes objects from a bucket
+    list_objects :
+        List all objects in a bucket path
+    create_signed_urls :
+        Create a signed URL for a file in a bucket
+    get_public_url :
+        Retrieve the public URL for a file in a public bucket
+    create_signed_upload_url :
+        Create a signed URL to upload a file to a path in a bucket
+    upload_to_signed_url :
+        Upload a file to a bucket using a token from `create_signed_upload_url`
     """
 
     def _connect(self, **kwargs) -> None:
