@@ -40,9 +40,12 @@ setuptools.setup(
         "Operating System :: OS Independent",
         "Programming Language :: Python",
         "Topic :: Software Development :: Libraries :: Python Modules",
+        "Topic :: Database",
+        "Topic :: Database :: Front-Ends",
+        "Topic :: Software Development :: Libraries :: Python Modules",
         "Topic :: Software Development :: User Interfaces",
     ],
     keywords=["streamlit", "supabase", "connection", "integration"],
     python_requires=">=3.8",
-    install_requires=["streamlit>=1.2", "supabase"],
+    install_requires=["streamlit", "supabase"],
 )
