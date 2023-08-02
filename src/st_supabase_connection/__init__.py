@@ -1,16 +1,23 @@
 import os
+import urllib
 from io import BytesIO
 from typing import Literal, Optional, Tuple, Union
 
 from streamlit.connections import ExperimentalBaseConnection
 from supabase import Client, create_client
 
-# TODO: Update demo app
-# TODO: Update README (highlight benefits 1. same methods as the supabase API
-# 2. Storage methods are built on storage3, the backend behind the supaabse API. So it supports methods not currently supported by supabase python API (TODO: supprt postgresy-py methods for database (https://github.com/supabase-community/postgrest-py/blob/master/postgrest/_sync/request_builder.py#L177C13-L177C13))
-# 3. Unified logging methods as opposed to supabase
-# 4. less code when using upload and download)
-# TODO: Add docstrings and example usage
+# TODO: Use cache_data wherever possible (pass ttl = 0 to disable caching)
+# eg
+# def get_bucket(ttl):
+#   @cache_data(ttl=ttl)
+#   def _get_bucket():
+#       return self.client.storage.get_bucket
+#   return _get_bucket
+# REF : https://discuss.streamlit.io/t/connections-hackathon/47574/24?u=siddhantsadangi
+# REF : https://github.com/streamlit/files-connection/blob/main/st_files_connection/connection.py#L136
+# TODO: Add cache to benefits in readme if implemented
+# TODO: Add optional headers to storage requests
+# TODO: support additional postgrest-py methods (https://github.com/supabase-community/postgrest-py/blob/master/postgrest/_sync/request_builder.py#L177C13-L177C13)
 
 __version__ = "0.0.2"
 
@@ -62,15 +69,6 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
             )
 
         self.client = create_client(url, key)
-        # TODO: Use cache_data wherever possible (pass ttl = 0 to disable caching)
-        # eg
-        # def get_bucket(ttl):
-        #   @cache_data(ttl=ttl)
-        #   def _get_bucket():
-        #       return self.client.storage.get_bucket
-        #   return _get_bucket
-        # REF : https://discuss.streamlit.io/t/connections-hackathon/47574/24?u=siddhantsadangi
-        # REF : https://github.com/streamlit/files-connection/blob/main/st_files_connection/connection.py#L136
         self.table = self.client.table
         self.get_bucket = self.client.storage.get_bucket
         self.list_buckets = self.client.storage.list_buckets
@@ -114,12 +112,7 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         )
         return response.json()
 
-    def upload(
-        self,
-        bucket_id: str,
-        file: BytesIO,
-        destination_path: str,
-    ) -> dict[str, str]:
+    def upload(self, bucket_id: str, file: BytesIO, destination_path: str) -> dict[str, str]:
         """
         Uploads a file to a Supabase bucket.
 
@@ -130,14 +123,14 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         file : BytesIO
             File to upload. This BytesIO object returned by `st.file_uploader()`.
         destination_path : str
-            Path is the bucket where the file will be uploaded to. Folders will be created as needed.
+            Path is the bucket where the file will be uploaded to. Folders will be created as needed. Defaults to `/filename.ext`
         """
         with open(file.name, "wb") as f:
             f.write(file.getbuffer())
         with open(file.name, "rb") as f:
             response = self.client.storage.from_(bucket_id).upload(
-                destination_path,
-                f,
+                path=destination_path or f"/{file.name}",
+                file=f,
                 file_options={"content-type": file.type},
             )
         return response.json()
@@ -335,3 +328,70 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         """
 
         return self.client.storage.from_(bucket_id).get_public_url(filepath)
+
+    def create_signed_upload_url(self, bucket_id: str, path: str) -> dict[str, str]:
+        """
+        Creates a signed upload URL.
+
+        Parameters
+        ----------
+        bucket_id : str
+            Unique identifier of the bucket.
+        path : str
+            The file path, including the file name.
+        """
+        from storage3.utils import StorageException
+
+        _path = self.client.storage.from_(bucket_id)._get_final_path(path)
+        response = self.client.storage.from_(bucket_id)._request(
+            "POST", f"/object/upload/sign/{_path}"
+        )
+        data = response.json()
+        full_url: urllib.parse.ParseResult = urllib.parse.urlparse(
+            str(self.client.storage._client.base_url) + data["url"]
+        )
+        query_params = urllib.parse.parse_qs(full_url.query)
+
+        if not query_params.get("token"):
+            raise StorageException("No token sent by the API")
+        return {
+            "signed_url": full_url.geturl(),
+            "token": query_params["token"][0],
+            "path": path,
+        }
+
+    def upload_to_signed_url(
+        self,
+        bucket_id: str,
+        path: str,
+        token: str,
+        file: BytesIO,
+    ) -> dict[str, str]:
+        """
+        Upload a file with a token generated from `.create_signed_url()`
+
+        Parameters
+        ----------
+        bucket_id : str
+            Unique identifier of the bucket.
+        path : str
+            The file path, including the file name. This path will be created if it does not exist.
+        token : str
+            The token generated from `.create_signed_url()`.
+        file : BytesIO
+            File to upload. This BytesIO object returned by `st.file_uploader()`.
+        """
+        _path = self.client.storage.from_(bucket_id)._get_final_path(path)
+        _url = urllib.parse.urlparse(f"/object/upload/sign/{_path}")
+        query_params = urllib.parse.urlencode({"token": token})
+        final_url = f"{_url.geturl()}?{query_params}"
+
+        filename = path.rsplit("/", maxsplit=1)[-1]
+        _file = {"file": (filename, file, file.type)}
+
+        response = self.client.storage.from_(bucket_id)._request(
+            "PUT",
+            final_url,
+            files=_file,
+        )
+        return response.json()

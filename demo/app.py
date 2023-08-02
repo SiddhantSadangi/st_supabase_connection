@@ -2,10 +2,9 @@ import contextlib
 
 import streamlit as st
 
-import st_supabase_connection
-from st_supabase_connection import SupabaseConnection
+from st_supabase_connection import SupabaseConnection, __version__
 
-VERSION = st_supabase_connection.__version__
+VERSION = __version__
 
 st.set_page_config(
     page_title="Streamlit SupabaseConnection Demo app",
@@ -19,7 +18,7 @@ st.set_page_config(
 )
 
 # ---------- INIT SESSION ----------
-upsert = bucket_id = file_size_limit = allowed_mime_types = None
+upsert = operators = bucket_id = file_size_limit = allowed_mime_types = None
 public = False
 
 STORAGE_OPERATIONS = [
@@ -80,57 +79,64 @@ with open("demo/sidebar.html", "r", encoding="UTF-8") as sidebar_file:
     sidebar_html = sidebar_file.read().replace("{VERSION}", VERSION)
 
 with st.sidebar:
+    with st.expander("💡**How to use**", expanded=True):
+        st.info(
+            """
+                1. Select a project and initialize client
+                2. Choose if you want to explore Supabase Storage or Database
+                3. Select the relevant operation and options
+                4. Run the query to get the results 
+                5. The app will construct the statement for that you can copy and use in your own app.
+                """
+        )
     st.components.v1.html(sidebar_html, height=600)
 
 # ---------- MAIN PAGE ----------
 st.header("🔌Streamlit SupabaseConnection Demo")
 
-st.write(
-    "📖 Demo for the `st_supabase_connection` Streamlit connection for Supabase Storage and Database."
-)
+st.write("📖 Demo and tutorial for `st_supabase_connection` for Supabase Storage and Database.")
 
 st.subheader("🏗️ Initialize Connection")
 
-project = st.radio(
-    label="Select Supabase project",
-    options=[
-        "Demo project",
-        "My own project",
-    ],
-    horizontal=True,
-)
+with st.expander("**Select project**", expanded=not st.session_state["initialized"]):
+    demo_tab, custom_tab = st.tabs(["👶Use demo project", "🫅Use your own project"])
 
-if project == "Demo project":
-    st.session_state["project"] = "demo"
-    st.warning(
-        "Limited data and operations",
-        icon="⚠️",
-    )
-    if st.button(
-        "Initialize client ⚡",
-        type="primary",
-        use_container_width=True,
-    ):
-        try:
-            st.session_state["client"] = st.experimental_connection(
-                name="supabase_connection",
-                type=SupabaseConnection,
-            )
-            st.session_state["initialized"] = True
-        except Exception as e:
-            st.error(
-                f"""Client initialization failed
-                {e}""",
-                icon="❌",
-            )
-            st.session_state["initialized"] = False
+    with demo_tab:
+        st.info(
+            "Limited data and operations",
+            icon="⚠️",
+        )
+        if st.button(
+            "Initialize client ⚡",
+            type="primary",
+            use_container_width=True,
+        ):
+            try:
+                st.session_state["client"] = st.experimental_connection(
+                    name="supabase_connection",
+                    type=SupabaseConnection,
+                )
+                st.session_state["initialized"] = True
+                st.session_state["project"] = "demo"
+            except Exception as e:
+                st.error(
+                    f"""Client initialization failed
+                    {e}""",
+                    icon="❌",
+                )
+                st.session_state["initialized"] = False
 
-elif project == "My own project":
-    st.session_state["project"] = "custom"
-    with st.expander(
-        label="Supabase credentials",
-        expanded=not st.session_state["initialized"],
-    ):
+            st.write("A connection is initialized as")
+            st.code(
+                """
+                st_supabase = st.experimental_connection(
+                    name="supabase_connection", type=SupabaseConnection
+                    )
+                """,
+                language="python",
+            )
+
+    with custom_tab:
         with st.form(key="credentials"):
             url = st.text_input("Enter Supabase URL")
             key = st.text_input("Enter Supabase key", type="password")
@@ -148,6 +154,7 @@ elif project == "My own project":
                         key=key,
                     )
                     st.session_state["initialized"] = True
+                    st.session_state["project"] = "custom"
                 except Exception as e:
                     st.error(
                         f"""Client initialization failed
@@ -156,206 +163,23 @@ elif project == "My own project":
                     )
                     st.session_state["initialized"] = False
 
+                st.write("A connection is initialized as")
+                st.code(
+                    """
+                    st_supabase = st.experimental_connection(
+                        name="supabase_connection", type=SupabaseConnection, url=url, key=key
+                        )
+                    """,
+                    language="python",
+                )
+
 if st.session_state["initialized"]:
     st.success("Client initialized!", icon="✅")
 
-st.write("A connection is initialized as")
-
-if st.session_state["project"] == "demo":
-    st.code(
-        """
-        st_supabase = st.experimental_connection(
-            name="supabase_connection", type=SupabaseConnection
-            )
-        """,
-        language="python",
-    )
-elif st.session_state["project"] == "custom":
-    st.code(
-        """
-        st_supabase = st.experimental_connection(
-            name="supabase_connection", type=SupabaseConnection, url=url, key=key
-            )
-        """,
-        language="python",
-    )
-
 if st.session_state["initialized"]:
-    lcol, rcol = st.columns(2)
-    storage = lcol.checkbox("Explore storage 🔍📦")
-    database = rcol.checkbox("Explore database 🔍🗄️")
+    storage, database = st.tabs(["Explore storage 🔍📦", "Explore database 🔍🗄️"])
 
-    if database:
-        st.subheader("🗄️ Run Database Queries")
-
-        if st.session_state["project"] == "custom":
-            st.warning(
-                "You are using your own project. Be careful while running DML queries!",
-                icon="ℹ️",
-            )
-        elif st.session_state["project"] == "demo":
-            st.write("Demo database schema")
-            st.markdown(
-                """
-                | Table | Columns | Size
-                |---|---|---
-                |`cities`| `id`, `country_id`, `name` | 2
-                |`countries`| `id`, `name`, `iso2`, `iso3`, `local_name`, `continent` | 249
-                |`messages`| `sender_id`, `receiver_id`, `content` | 2
-                |`teams`| `id`, `name` | 2
-                |`users`| `id`, `name` | 2
-                |`users_teams`| `user_id`, `team_id` | 3
-                """
-            )
-        if st.session_state["project"] == "demo":
-            table = st.selectbox(
-                "Select the table name",
-                options=[
-                    "cities",
-                    "countries",
-                    "messages",
-                    "teams",
-                    "users",
-                    "users_teams",
-                ],
-                index=1,
-            )
-        elif st.session_state["project"] == "custom":
-            table = st.text_input(
-                "Enter the table name",
-                value="countries",
-                placeholder="countries",
-            )
-
-        lcol, mcol, rcol = st.columns(3)
-        request_builder = lcol.selectbox(
-            "Select the query type",
-            options=["select", "insert", "upsert", "update", "delete"],
-        )
-        count_method = mcol.selectbox(
-            "Enter the count method",
-            options=[None, "exact", "planned", "estimated"],
-            help=f"""
-            Count algorithm to use to count {request_builder}ed rows.  
-            `None`: Does not return a count.  
-            `"exact"`: Exact but slow count algorithm. Performs a `COUNT(*)` under the hood.  
-            `"planned"`: Approximated but fast count algorithm. Uses the Postgres statistics under the hood.  
-            `"estimated"`: Uses exact count for low numbers and planned count for high numbers.  
-            """,
-        )
-        rcol_placeholder = rcol.empty()
-
-        if request_builder == "insert":
-            request_builder_query_label = "Enter the rows to insert as json (for single row) or array of jsons (for multiple rows)"
-            placeholder = (
-                value
-            ) = """[{"name":"Wakanda","iso2":"WK"},{"name":"Wadiya","iso2":"WD"}]"""
-            upsert = rcol_placeholder.checkbox(
-                label="Upsert",
-                help="Whether the query should be an upsert",
-            )
-        elif request_builder == "select":
-            request_builder_query_label = "Enter the columns to fetch as comma-separated strings"
-            placeholder = value = "*"
-        elif request_builder == "delete":
-            request_builder_query_label = "Delete query"
-            placeholder = value = "Delete does not take a request builder query"
-        elif request_builder == "upsert":
-            request_builder_query_label = "Enter the rows to upsert as json (for single row) or array of jsons (for multiple rows)"
-            placeholder = value = """{"name":"Wakanda","iso2":"WK", "continent":"Africa"}"""
-            ignore_duplicates = rcol_placeholder.checkbox(
-                label="Ignore duplicates",
-                help="Whether duplicate rows should be ignored",
-            )
-        elif request_builder == "update":
-            request_builder_query_label = "Enter the rows to update as json (for single row) or array of jsons (for multiple rows)"
-            placeholder = value = """{"iso3":"N/A","continent":"N/A"}"""
-        request_builder_query = st.text_input(
-            label=request_builder_query_label,
-            placeholder=placeholder,
-            value=value,
-            help="[RequestBuilder API reference](https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html#postgrest.AsyncRequestBuilder)",
-            disabled=request_builder == "delete",
-        )
-
-        if request_builder == "upsert" and not ignore_duplicates:
-            on_conflict = st.text_input(
-                label="Enter the columns to be considered UNIQUE in case of conflicts as comma-separated values",
-                placeholder="id",
-                value="id",
-                help="Specified columns to be made to work with UNIQUE constraint.",
-            )
-
-        request_builder_query = (
-            f'"{request_builder_query}"' if request_builder == "select" else request_builder_query
-        )
-        request_builder_query = (
-            f'count="{count_method}"'
-            if request_builder == "delete"
-            else f'{request_builder_query}, count="{count_method}"'
-        )
-        if upsert:
-            request_builder_query = f'{request_builder_query}, upsert="{upsert}"'
-
-        operators = st.text_input(
-            label="Chain any operators and filters you want 🔗",
-            value=""".eq("continent","Asia").order("name",desc=True).limit(5)""",
-            placeholder=""".eq("continent","Asia").order("name",desc=True).limit(5)""",
-            help="List of all available [operators](https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html#postgrest.AsyncSelectRequestBuilder) and [filters](https://postgrest-py.readthedocs.io/en/latest/api/filters.html#postgrest.AsyncFilterRequestBuilder)",
-        )
-
-        operators = operators.replace(".__init__()", "").replace(".execute()", "")
-
-        constructed_db_query = f"""st_supabase.table("{table}").{request_builder}({request_builder_query}){operators}.execute()"""
-        st.write("Constructed query")
-        st.code(constructed_db_query)
-
-        lcol, rcol = st.columns([2, 1])
-        view = lcol.radio(
-            label="View output as",
-            options=["Dataframe", "Dict (recommended for joins)"],
-            horizontal=True,
-        )
-
-        if rcol.button(
-            "Run query 🏃",
-            use_container_width=True,
-            type="primary",
-            disabled=st.session_state["project"] == "demo"
-            and request_builder in ["insert", "upsert", "update", "delete"],
-            help=f"{request_builder.upper()} not allowed in demo project"
-            if st.session_state["project"] == "demo"
-            and request_builder in ["insert", "upsert", "update", "delete"]
-            else None,
-            key="run_db_query",
-        ):
-            try:
-                data, count = eval(constructed_db_query)
-
-                if count_method:
-                    st.write(f"{count[-1]} rows {request_builder}ed")
-                if view == "Dataframe":
-                    st.dataframe(data[-1], use_container_width=True)
-                else:
-                    st.write(data[-1])
-            except ValueError:
-                if count_method == "planned":
-                    st.error(
-                        "Operation too small for `planned` count method. Please change count method."
-                    )
-            except Exception as e:
-                if e.__class__.__name__ == "ConnectError":
-                    st.error(
-                        "Could not connect. Please check the Supabase URL provided",
-                        icon="❌",
-                    )
-                else:
-                    st.error(
-                        e,
-                        icon="❌",
-                    )
-
-    if storage:
+    with storage:
         st.subheader("📦 Run Storage Queries")
 
         if st.session_state["project"] == "custom":
@@ -364,6 +188,10 @@ if st.session_state["initialized"]:
                 icon="ℹ️",
             )
         elif st.session_state["project"] == "demo":
+            st.info(
+                "You are using the demo project. Some functionality won't be available.",
+                icon="ℹ️",
+            )
             st.write("Demo storage schema")
             st.markdown(
                 """
@@ -469,19 +297,25 @@ if st.session_state["initialized"]:
             constructed_storage_query = f"""st_supabase.{operation}('{bucket_id}',{file_size_limit=},allowed_mime_types={allowed_mime_types},{public=})"""
 
         elif operation == "upload":
+            destination_path = None
             uploaded_file = st.file_uploader("Choose a file")
-            destination_path = st.text_input(
-                "Enter destination path in the bucket",
-                placeholder="/parentFolder/subFolder/file.txt",
-            )
+            if uploaded_file:
+                destination_path = st.text_input(
+                    "Enter destination path in the bucket",
+                    placeholder=uploaded_file.name,
+                )
 
-            constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}", file={uploaded_file}, destination_path="{destination_path}")"""
-            st.session_state["storage_disabled"] = (
-                False if all([bucket_id, uploaded_file, destination_path]) else True
-            )
+                st.session_state["storage_disabled"] = (
+                    False if all([bucket_id, uploaded_file]) else True
+                )
+            constructed_storage_query = f"""
+            st_supabase.{operation}("{bucket_id}", file={uploaded_file}, destination_path="{destination_path}")
+            # `UploadedFile` is the `BytesIO` object returned by `st.file_uploader()`
+            """
 
         elif operation == "list_buckets":
             constructed_storage_query = f"""st_supabase.{operation}()"""
+            st.session_state["storage_disabled"] = False
 
         elif operation == "download":
             source_path = st.text_input(
@@ -492,6 +326,8 @@ if st.session_state["initialized"]:
             constructed_storage_query = (
                 f"""st_supabase.{operation}("{bucket_id}", {source_path=})"""
             )
+            st.session_state["storage_disabled"] = False if all([bucket_id, source_path]) else True
+
         elif operation == "move":
             from_path = st.text_input(
                 "Enter source path in the bucket",
@@ -554,6 +390,7 @@ if st.session_state["initialized"]:
             constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}", {path=}, {limit=}, {offset=}, {sortby=}, {order=})"""
 
             st.session_state["storage_disabled"] = False if bucket_id else True
+
         elif operation == "get_public_url":
             filepath = st.text_input(
                 "Enter the path to file",
@@ -562,6 +399,7 @@ if st.session_state["initialized"]:
 
             constructed_storage_query = f"""st_supabase.get_public_url("{bucket_id}",{filepath=})"""
             st.session_state["storage_disabled"] = False if all([bucket_id, filepath]) else True
+
         elif operation == "create_signed_urls":
             lcol, rcol = st.columns([2, 1])
             paths = lcol.text_input(
@@ -582,15 +420,46 @@ if st.session_state["initialized"]:
                 False if all([bucket_id, paths, expires_in]) else True
             )
 
-        # TODO: create_signed_upload_url, upload_to_signed_url,
+        elif operation == "create_signed_upload_url":
+            path = st.text_input(
+                "Enter the file path",
+                placeholder="/folder/subFolder/image.jpg",
+            )
+            constructed_storage_query = (
+                f"""st_supabase.create_signed_upload_url("{bucket_id}",{path=})"""
+            )
+            st.session_state["storage_disabled"] = False if all([bucket_id, path]) else True
+
+        elif operation == "upload_to_signed_url":
+            path = None
+            uploaded_file = st.file_uploader("Choose a file")
+            if uploaded_file:
+                path = st.text_input(
+                    "Enter destination path in the bucket",
+                    placeholder="/folder/subFolder/image.jpg",
+                )
+
+                token = st.text_input(
+                    "Enter the token",
+                    type="password",
+                    help="This is generated by `.create_signed_url()`",
+                )
+
+                st.session_state["storage_disabled"] = (
+                    False if all([bucket_id, token, path]) else True
+                )
+            constructed_storage_query = f"""
+            st_supabase.{operation}("{bucket_id}", {path=}, token="***", file={uploaded_file})
+            # `UploadedFile` is the `BytesIO` object returned by `st.file_uploader()`
+            """
+
+        st.write("**Constructed statement**")
         if operation == "download":
-            st.write("Constructed statement")
             st.code(
                 f"file_name, mime, data = {constructed_storage_query}",
                 language="python",
             )
         else:
-            st.write("Constructed statement")
             st.code(constructed_storage_query, language="python")
 
         st.session_state["storage_disabled"] = (
@@ -599,10 +468,10 @@ if st.session_state["initialized"]:
             else st.session_state["storage_disabled"]
         )
 
-        if st.session_state["storage_disabled"]:
-            help = "A required input is missing"
-        elif st.session_state["project"] == "demo" and operation in RESTRICTED_STORAGE_OPERATORS:
+        if st.session_state["project"] == "demo" and operation in RESTRICTED_STORAGE_OPERATORS:
             help = f"'{selected_operation.capitalize()}' not allowed in demo project"
+        elif st.session_state["storage_disabled"]:
+            help = "A required input is missing"
         else:
             help = None
 
@@ -626,6 +495,10 @@ if st.session_state["initialized"]:
                         file_name=file_name,
                         mime=mime,
                         use_container_width=True,
+                    )
+                elif operation == "upload_to_signed_url":
+                    response = st_supabase.upload_to_signed_url(
+                        bucket_id, path, token, uploaded_file
                     )
                 else:
                     response = eval(constructed_storage_query)
@@ -654,7 +527,7 @@ if st.session_state["initialized"]:
                         )
                     elif (
                         operation == "upload"
-                        and response["Key"] == f"{bucket_id}/{destination_path}"
+                        and response["Key"] == f"{bucket_id}/{destination_path.lstrip('/')}"
                     ):
                         st.success(
                             f"Uploaded **{uploaded_file.name}** to **{response['Key']}**",
@@ -669,15 +542,212 @@ if st.session_state["initialized"]:
                     elif operation == "get_public_url":
                         st.success(response, icon="🔗")
                     elif operation == "create_signed_urls":
-                        st.warning(f"These URLs are valid only for {expires_in} seconds", icon="⚠️")
+                        st.warning(
+                            f"These URLs are valid only for {expires_in} seconds",
+                            icon="⚠️",
+                        )
                         for items in response:
                             st.write(f"**File:** {items['path']}")
                             if items["signedURL"]:
                                 st.success(items["signedURL"], icon="🔗")
                             else:
                                 st.error(items["error"], icon="❌")
+                    elif operation == "list_buckets":
+                        st.info(f"Listing **{len(response)}** buckets")
+                        st.write(response)
+                    elif operation == "create_signed_upload_url":
+                        st.write("Signed URL")
+                        st.info(f"{response['signed_url']}", icon="🔗")
+                        st.write("Token")
+                        st.code(response["token"], language="text")
+                        st.write("Path")
+                        st.code(response["path"])
+                    elif operation == "upload_to_signed_url":
+                        if response["Key"] == f"{bucket_id}/{path.lstrip('/')}":
+                            st.success(
+                                f"Uploaded **{uploaded_file.name}** to **{response['Key']}**",
+                                icon="✅",
+                            )
                     else:
                         st.write(response)
+            except Exception as e:
+                if e.__class__.__name__ == "ConnectError":
+                    st.error(
+                        "Could not connect. Please check the Supabase URL provided",
+                        icon="❌",
+                    )
+                else:
+                    st.error(
+                        e,
+                        icon="❌",
+                    )
+
+    with database:
+        st.subheader("🗄️ Run Database Queries")
+
+        if st.session_state["project"] == "custom":
+            st.warning(
+                "You are using your own project. Be careful while running DML queries!",
+                icon="ℹ️",
+            )
+        elif st.session_state["project"] == "demo":
+            st.info(
+                "You are using the demo project. Some functionality won't be available.",
+                icon="ℹ️",
+            )
+            st.write("Demo database schema")
+            st.markdown(
+                """
+                | Table | Columns | Size
+                |---|---|---
+                |`cities`| `id`, `country_id`, `name` | 2
+                |`countries`| `id`, `name`, `iso2`, `iso3`, `local_name`, `continent` | 249
+                |`messages`| `sender_id`, `receiver_id`, `content` | 2
+                |`teams`| `id`, `name` | 2
+                |`users`| `id`, `name` | 2
+                |`users_teams`| `user_id`, `team_id` | 3
+                """
+            )
+        if st.session_state["project"] == "demo":
+            table = st.selectbox(
+                "Select the table name",
+                options=[
+                    "cities",
+                    "countries",
+                    "messages",
+                    "teams",
+                    "users",
+                    "users_teams",
+                ],
+                index=1,
+            )
+        elif st.session_state["project"] == "custom":
+            table = st.text_input(
+                "Enter the table name",
+                value="countries",
+                placeholder="countries",
+            )
+
+        lcol, mcol, rcol = st.columns(3)
+        request_builder = lcol.selectbox(
+            "Select the query type",
+            options=["select", "insert", "upsert", "update", "delete"],
+        )
+        count_method = mcol.selectbox(
+            "Enter the count method",
+            options=[None, "exact", "planned", "estimated"],
+            help=f"""
+            Count algorithm to use to count {request_builder}ed rows.  
+            `None`: Does not return a count.  
+            `"exact"`: Exact but slow count algorithm. Performs a `COUNT(*)` under the hood.  
+            `"planned"`: Approximated but fast count algorithm. Uses the Postgres statistics under the hood.  
+            `"estimated"`: Uses exact count for low numbers and planned count for high numbers.  
+            """,
+        )
+        rcol_placeholder = rcol.empty()
+
+        if request_builder == "insert":
+            request_builder_query_label = "Enter the rows to insert as json (for single row) or array of jsons (for multiple rows)"
+            placeholder = (
+                value
+            ) = """[{"name":"Wakanda","iso2":"WK"},{"name":"Wadiya","iso2":"WD"}]"""
+            upsert = rcol_placeholder.checkbox(
+                label="Upsert",
+                help="Whether the query should be an upsert",
+            )
+        elif request_builder == "select":
+            request_builder_query_label = "Enter the columns to fetch as comma-separated strings"
+            placeholder = value = "*"
+        elif request_builder == "delete":
+            request_builder_query_label = "Delete query"
+            placeholder = value = "Delete does not take a request builder query"
+        elif request_builder == "upsert":
+            request_builder_query_label = "Enter the rows to upsert as json (for single row) or array of jsons (for multiple rows)"
+            placeholder = value = """{"name":"Wakanda","iso2":"WK", "continent":"Africa"}"""
+            ignore_duplicates = rcol_placeholder.checkbox(
+                label="Ignore duplicates",
+                help="Whether duplicate rows should be ignored",
+            )
+        elif request_builder == "update":
+            request_builder_query_label = "Enter the rows to update as json (for single row) or array of jsons (for multiple rows)"
+            placeholder = value = """{"iso3":"N/A","continent":"N/A"}"""
+        request_builder_query = st.text_input(
+            label=request_builder_query_label,
+            placeholder=placeholder,
+            value=value,
+            help="[RequestBuilder API reference](https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html#postgrest.AsyncRequestBuilder)",
+            disabled=request_builder == "delete",
+        )
+
+        if request_builder == "upsert" and not ignore_duplicates:
+            on_conflict = st.text_input(
+                label="Enter the columns to be considered UNIQUE in case of conflicts as comma-separated values",
+                placeholder="id",
+                value="id",
+                help="Specified columns to be made to work with UNIQUE constraint.",
+            )
+
+        request_builder_query = (
+            f'"{request_builder_query}"' if request_builder == "select" else request_builder_query
+        )
+        request_builder_query = (
+            f'count="{count_method}"'
+            if request_builder == "delete"
+            else f'{request_builder_query}, count="{count_method}"'
+        )
+        if upsert:
+            request_builder_query = f'{request_builder_query}, upsert="{upsert}"'
+
+        if request_builder not in ["insert", "update", "upsert"]:
+            operators = st.text_input(
+                label="Chain any operators and filters you want 🔗",
+                value=""".eq("continent","Asia").order("name",desc=True).limit(5)""",
+                placeholder=""".eq("continent","Asia").order("name",desc=True).limit(5)""",
+                help="List of all available [operators](https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html#postgrest.AsyncSelectRequestBuilder) and [filters](https://postgrest-py.readthedocs.io/en/latest/api/filters.html#postgrest.AsyncFilterRequestBuilder)",
+            )
+
+            operators = operators.replace(".__init__()", "").replace(".execute()", "")
+
+        if operators:
+            constructed_db_query = f"""st_supabase.table("{table}").{request_builder}({request_builder_query}){operators}.execute()"""
+        else:
+            constructed_db_query = f"""st_supabase.table("{table}").{request_builder}({request_builder_query}).execute()"""
+        st.write("**Constructed statement**")
+        st.code(constructed_db_query)
+
+        lcol, rcol = st.columns([2, 1])
+        view = lcol.radio(
+            label="View output as",
+            options=["Dataframe", "Dict (recommended for joins)"],
+            horizontal=True,
+        )
+
+        if rcol.button(
+            "Run query 🏃",
+            use_container_width=True,
+            type="primary",
+            disabled=st.session_state["project"] == "demo"
+            and request_builder in ["insert", "upsert", "update", "delete"],
+            help=f"{request_builder.upper()} not allowed in demo project"
+            if st.session_state["project"] == "demo"
+            and request_builder in ["insert", "upsert", "update", "delete"]
+            else None,
+            key="run_db_query",
+        ):
+            try:
+                data, count = eval(constructed_db_query)
+
+                if count_method:
+                    st.write(f"{count[-1]} rows {request_builder}ed")
+                if view == "Dataframe":
+                    st.dataframe(data[-1], use_container_width=True)
+                else:
+                    st.write(data[-1])
+            except ValueError:
+                if count_method == "planned":
+                    st.error(
+                        "Operation too small for `planned` count method. Please change count method."
+                    )
             except Exception as e:
                 if e.__class__.__name__ == "ConnectError":
                     st.error(
