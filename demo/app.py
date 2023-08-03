@@ -658,6 +658,13 @@ if st.session_state["initialized"]:
         elif request_builder == "select":
             request_builder_query_label = "Enter the columns to fetch as comma-separated strings"
             placeholder = value = "*"
+            ttl = rcol_placeholder.text_input(
+                "Enter cache expiry duration",
+                value=0,
+                placeholder=None,
+                help="Set as `0` to always fetch the latest results, and leave blank to cache indefinitely.",
+            )
+            ttl = None if ttl == "" else ttl
         elif request_builder == "delete":
             request_builder_query_label = "Delete query"
             placeholder = value = "Delete does not take a request builder query"
@@ -709,9 +716,15 @@ if st.session_state["initialized"]:
             operators = operators.replace(".__init__()", "").replace(".execute()", "")
 
         if operators:
-            constructed_db_query = f"""st_supabase.table("{table}").{request_builder}({request_builder_query}){operators}.execute()"""
+            if request_builder == "select":
+                constructed_db_query = f"""st_supabase.query({request_builder_query}, from_="{table}", {ttl=}){operators}.execute()"""
+            else:
+                constructed_db_query = f"""st_supabase.table("{table}").{request_builder}({request_builder_query}){operators}.execute()"""
         else:
-            constructed_db_query = f"""st_supabase.table("{table}").{request_builder}({request_builder_query}).execute()"""
+            if request_builder == "select":
+                constructed_db_query = f"""st_supabase.query({request_builder_query}, from_="{table}", {ttl=}).execute()"""
+            else:
+                constructed_db_query = f"""st_supabase.table("{table}").{request_builder}({request_builder_query}).execute()"""
         st.write("**Constructed statement**")
         st.code(constructed_db_query)
 

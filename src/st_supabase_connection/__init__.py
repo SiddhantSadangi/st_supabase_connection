@@ -1,8 +1,11 @@
 import os
 import urllib
+from datetime import timedelta
 from io import BytesIO
-from typing import Literal, Optional, Tuple, Union
+from typing import Literal, Optional, Tuple, Union, types
 
+from postgrest import SyncSelectRequestBuilder, types
+from streamlit import cache_resource
 from streamlit.connections import ExperimentalBaseConnection
 from supabase import Client, create_client
 
@@ -13,13 +16,11 @@ from supabase import Client, create_client
 #   def _get_bucket():
 #       return self.client.storage.get_bucket
 #   return _get_bucket
-# REF : https://discuss.streamlit.io/t/connections-hackathon/47574/24?u=siddhantsadangi
-# REF : https://github.com/streamlit/files-connection/blob/main/st_files_connection/connection.py#L136
 # TODO: Add cache to benefits in readme if implemented
 # TODO: Add optional headers to storage requests
 # TODO: support additional postgrest-py methods (https://github.com/supabase-community/postgrest-py/blob/master/postgrest/_sync/request_builder.py#L177C13-L177C13)
 
-__version__ = "0.0.2"
+__version__ = "0.0.4"
 
 
 class SupabaseConnection(ExperimentalBaseConnection[Client]):
@@ -37,36 +38,6 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
     -------
     table :
         Perform a table operation
-    get_bucket :
-        Retrieve a bucket
-    list_buckets :
-        List all buckets
-    delete_bucket :
-        Delete a bucket
-    empty_bucket :
-        Empty a bucket
-    create_bucket :
-        Create a bucket
-    upload :
-        Upload files to a bucket
-    download :
-        Download files from a bucket
-    update_bucket :
-        Update bucket properties
-    move :
-        Move objects within a bucket
-    remove :
-        Removes objects from a bucket
-    list_objects :
-        List all objects in a bucket path
-    create_signed_urls :
-        Create a signed URL for a file in a bucket
-    get_public_url :
-        Retrieve the public URL for a file in a public bucket
-    create_signed_upload_url :
-        Create a signed URL to upload a file to a path in a bucket
-    upload_to_signed_url :
-        Upload a file to a bucket using a token from `create_signed_upload_url`
     """
 
     def _connect(self, **kwargs) -> None:
@@ -104,6 +75,36 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         self.list_buckets = self.client.storage.list_buckets
         self.delete_bucket = self.client.storage.delete_bucket
         self.empty_bucket = self.client.storage.empty_bucket
+
+    def query(
+        self,
+        *columns: str,
+        from_: str,
+        count: Optional[types.CountMethod] = None,
+        ttl: Optional[Union[int, str, timedelta]] = None,
+    ) -> SyncSelectRequestBuilder:
+        """
+        Run a SELECT query.
+
+        Parameters
+        ----------
+        *columns : str
+            The names of the columns to fetch.
+        from_ : str
+            The table to run the query on.
+        count : str
+            The method to use to get the count of rows returned. Defaults to `None`.
+        ttl : float, timedelta, str, or None
+            The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
+        """
+
+        @cache_resource(
+            ttl=ttl
+        )  # The return object is not serializable. This behaviour was retained to let users chain operations to the query
+        def _query(_self, *columns, from_, count):
+            return _self.client.table(from_).select(*columns, count=count)
+
+        return _query(self, *columns, from_=from_, count=count)
 
     def create_bucket(
         self,

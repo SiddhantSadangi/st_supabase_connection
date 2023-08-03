@@ -3,6 +3,7 @@
 
 A Streamlit connection component to connect Streamlit to Supabase Storage and Database.
 ## :thinking: Why use this?
+- [X] A new `query()` method available to run cached select queries on the database. **Save time and money** on your API requests
 - [X] **Same method names as the Supabase Python API**
 - [X] It is built on top of [`storage-py`](https://github.com/supabase-community/storage-py) and **exposes more methods** than currently supported by the Supabase Python API. For example, `update()`, `create_signed_upload_url()`, and `upload_to_signed_url()`
 - [X] **Consistent logging syntax.** All statements follow the syntax `client.method("bucket_id", **options)`
@@ -41,7 +42,7 @@ A Streamlit connection component to connect Streamlit to Supabase Storage and Da
       mime = mimetypes.guess_type(file_name)[0]
       data = open(file_name, "rb")
 
-      st.download_button("Download file ⏬", data=data, file_name=file_name, mime=mime)
+      st.download_button("Download file", data=data, file_name=file_name, mime=mime)
   ```
 
   </td>
@@ -61,7 +62,7 @@ A Streamlit connection component to connect Streamlit to Supabase Storage and Da
   if st.button("Request download"):
       file_name, mime, data = st_supabase_client.download(bucket_id, source_path)
 
-      st.download_button("Download file ⏬", data=data, file_name=file_name, mime=mime)
+      st.download_button("Download file", data=data, file_name=file_name, mime=mime)
 
   ```
 
@@ -158,8 +159,28 @@ pip install st-supabase-connection
 #### List existing buckets
 ```python
 >>> st_supabase.list_buckets()
-[SyncBucket(id='bucket1', name='bucket1', owner='', public=False, created_at=datetime.datetime(2023, 7, 31, 19, 56, 21, 518438, tzinfo=tzutc()), updated_at=datetime.datetime(2023, 7, 31, 19, 56, 21, 518438, tzinfo=tzutc()), file_size_limit=None, allowed_mime_types=None),
- SyncBucket(id='bucket2', name='bucket2', owner='', public=True, created_at=datetime.datetime(2023, 7, 31, 19, 56, 28, 203536, tzinfo=tzutc()), updated_at=datetime.datetime(2023, 7, 31, 19, 56, 28, 203536, tzinfo=tzutc()), file_size_limit=100, allowed_mime_types=["image/jpg","image/png"])]
+[
+    SyncBucket(
+        id="bucket1",
+        name="bucket1",
+        owner="",
+        public=False,
+        created_at=datetime.datetime(2023, 7, 31, 19, 56, 21, 518438, tzinfo=tzutc()),
+        updated_at=datetime.datetime(2023, 7, 31, 19, 56, 21, 518438, tzinfo=tzutc()),
+        file_size_limit=None,
+        allowed_mime_types=None,
+    ),
+    SyncBucket(
+        id="bucket2",
+        name="bucket2",
+        owner="",
+        public=True,
+        created_at=datetime.datetime(2023, 7, 31, 19, 56, 28, 203536, tzinfo=tzutc()),
+        updated_at=datetime.datetime(2023, 7, 31, 19, 56, 28, 203536, tzinfo=tzutc()),
+        file_size_limit=100,
+        allowed_mime_types=["image/jpg", "image/png"],
+    ),
+]
 ```
 #### Create a bucket
 ```python
@@ -186,49 +207,77 @@ pip install st-supabase-connection
 #### List objects in a bucket
 ```python
 >>> st_supabase_client.list_objects("new_bucket", path="folder1")
-[{'name': 'new_test.png',
-  'id': 'e506920e-2834-440e-85f1-1d5476927582',
-  'updated_at': '2023-08-02T19:53:22.53986+00:00',
-  'created_at': '2023-08-02T19:52:20.404391+00:00',
-  'last_accessed_at': '2023-08-02T19:53:21.833+00:00',
-  'metadata': {'eTag': '"814a0034f5549e957ee61360d87457e5"',
-   'size': 473831,
-   'mimetype': 'image/png',
-   'cacheControl': 'max-age=3600',
-   'lastModified': '2023-08-02T19:53:23.000Z',
-   'contentLength': 473831,
-   'httpStatusCode': 200}}]
+[
+    {
+        "name": "new_test.png",
+        "id": "e506920e-2834-440e-85f1-1d5476927582",
+        "updated_at": "2023-08-02T19:53:22.53986+00:00",
+        "created_at": "2023-08-02T19:52:20.404391+00:00",
+        "last_accessed_at": "2023-08-02T19:53:21.833+00:00",
+        "metadata": {
+            "eTag": '"814a0034f5549e957ee61360d87457e5"',
+            "size": 473831,
+            "mimetype": "image/png",
+            "cacheControl": "max-age=3600",
+            "lastModified": "2023-08-02T19:53:23.000Z",
+            "contentLength": 473831,
+            "httpStatusCode": 200,
+        },
+    }
+]
 ```
 #### Delete a bucket
 ```python
 >>> st_supabase_client.delete_bucket("new_bucket")
+{'message': 'Successfully deleted'}
 ```
-### :file_cabinet: Database
-> [!NOTE]  
-> The connector's database methods behave exactly the same way as the Supabase Python API's database methods. Check the [Supabase Python API reference](https://supabase.com/docs/reference/python/select) for more examples.
+### :file_cabinet: Database operations
 #### Simple query 
 ```python
->>> st_supabase_client.table('countries').select("*").execute()
-APIResponse(data=[{'id': 1, 'name': 'Afghanistan'},
-                  {'id': 2, 'name': 'Albania'},
-                  {'id': 3, 'name': 'Algeria'}],
-            count=None)
+>>> st_supabase.query("*", from_="countries", ttl=None).execute()
+APIResponse(
+    data=[
+        {"id": 1, "name": "Afghanistan"},
+        {"id": 2, "name": "Albania"},
+        {"id": 3, "name": "Algeria"},
+    ],
+    count=None,
+)
 ```
 #### Query with join
 ```python
->>> st_supabase_client.table('users').select('name, teams(name)').execute()
-APIResponse(data=[
-                  {'name': 'Kiran', 'teams': [{'name': 'Green'}, {'name': 'Blue'}]},
-                  {'name': 'Evan', 'teams': [{'name': 'Blue'}]}
-                 ],
-            count=None)
+>>> st_supabase.query("name, teams(name)", from_="users",  count="exact", ttl=None).execute()
+APIResponse(
+    data=[
+        {"name": "Kiran", "teams": [{"name": "Green"}, {"name": "Blue"}]},
+        {"name": "Evan", "teams": [{"name": "Blue"}]},
+    ],
+    count=None,
+)
 ```
 #### Filter through foreign tables
 ```python
->>> st_supabase_client.table('cities').select('name, countries(*)').eq('countries.name', 'Estonia').execute()
-APIResponse(data=[{'name': 'Bali', 'countries': None},
-                  {'name': 'Munich', 'countries': None}],
-            count=None)
+>>> st_supabase.query("name, countries(*)", count="exact", from_="cities", ttl=0).eq(
+        "countries.name", "Curaçao"
+    ).execute()
+
+APIResponse(
+    data=[
+        {
+            "name": "Kralendijk",
+            "countries": {
+                "id": 2,
+                "name": "Curaçao",
+                "iso2": "CW",
+                "iso3": "CUW",
+                "local_name": None,
+                "continent": None,
+            },
+        },
+        {"name": "Willemstad", "countries": None},
+    ],
+    count=2,
+)
 ```
 
 #### Insert rows
@@ -236,15 +285,38 @@ APIResponse(data=[{'name': 'Bali', 'countries': None},
 >>> st_supabase_client.table("countries").insert(
         [{"name": "Wakanda", "iso2": "WK"}, {"name": "Wadiya", "iso2": "WD"}], count="None"
     ).execute()
-APIResponse(data=[{'id': 250, 'name': 'Wakanda', 'iso2': 'WK', 'iso3': None, 'local_name': None, 'continent': None}, {'id': 251, 'name': 'Wadiya', 'iso2': 'WD', 'iso3': None, 'local_name': None, 'continent': None}], count=None)
+APIResponse(
+    data=[
+        {
+            "id": 250,
+            "name": "Wakanda",
+            "iso2": "WK",
+            "iso3": None,
+            "local_name": None,
+            "continent": None,
+        },
+        {
+            "id": 251,
+            "name": "Wadiya",
+            "iso2": "WD",
+            "iso3": None,
+            "local_name": None,
+            "continent": None,
+        },
+    ],
+    count=None,
+)
 ```
+> [!INFO]  
+> Check the [Supabase Python API reference](https://supabase.com/docs/reference/python/select) for more examples.
+
 ## :star: Explore all options in Streamlit
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-supabase-connection.streamlit.app/)
 
 ## :bow: Acknowledgements
 This connector builds upon the awesome work done by the open-source community in general and the [Supabase Community](https://github.com/supabase-community) in particular. I cannot be more thankful to all the authors whose work I have used either directly or indirectly.
 
-## 🤗 Want to support my work?
+## :hugs: Want to support my work?
 <p align="center">
     <a href="https://www.buymeacoffee.com/siddhantsadangi" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;">
     </a>
