@@ -3,13 +3,12 @@
 
 A Streamlit connection component to connect Streamlit to Supabase Storage and Database.
 ## :thinking: Why use this?
-- [X] A new `query()` method available to run cached select queries on the database. **Save time and money** on your API requests
-- [X] **Same method names as the Supabase Python API**
-- [X] It is built on top of [`storage-py`](https://github.com/supabase-community/storage-py) and **exposes more methods** than currently supported by the Supabase Python API. For example, `update()`, `create_signed_upload_url()`, and `upload_to_signed_url()`
-- [X] **Consistent logging syntax.** All statements follow the syntax `client.method("bucket_id", **options)`
+- [X] Cache functionality to cache returned results. **Save time and money** on your API requests
+- [X] Same method names as the Supabase Python API. **Minimum relearning required**
+- [X] Built on top of [`storage-py`](https://github.com/supabase-community/storage-py) and **exposes more methods** than currently supported by the Supabase Python API. For example, `update()`, `create_signed_upload_url()`, and `upload_to_signed_url()`
 - [X] **Less keystrokes required** when integrating with your Streamlit app.
 
-  <details open>
+  <details close>
   <summary>Examples with and without the connector </summary>
   <br>
   <table>
@@ -133,7 +132,7 @@ pip install st-supabase-connection
 ```
 2. Set the `SUPABASE_URL` and `SUPABASE_KEY` Streamlit secrets as described [here](https://docs.streamlit.io/streamlit-community-cloud/get-started/deploy-an-app/connect-to-data-sources/secrets-management).
 
-> [!NOTE]  
+> [!INFO]  
 > For local development outside Streamlit, you can also set these as your environment variables (recommended), or pass these to the `url` and `key` args of `st.experimental_connection()` (not recommended).
 
 ## :pen: Usage
@@ -147,18 +146,19 @@ pip install st-supabase-connection
   st_supabase_client = st.experimental_connection(
       name="YOUR_CONNECTION_NAME",
       type=SupabaseConnection,
+      ttl=None,
       url="YOUR_SUPABASE_URL", # not needed if provided as a streamlit secret
       key="YOUR_SUPABASE_KEY", # not needed if provided as a streamlit secret
   )
   ```
-3. Happy Streamlit-ing! :balloon:
+3. Use in your app to query tables and files. Happy Streamlit-ing! :balloon:
 
 ## :writing_hand: Examples
 ### :package: Storage operations
 
 #### List existing buckets
 ```python
->>> st_supabase.list_buckets()
+>>> st_supabase.list_buckets(ttl=None)
 [
     SyncBucket(
         id="bucket1",
@@ -206,7 +206,7 @@ pip install st-supabase-connection
 
 #### List objects in a bucket
 ```python
->>> st_supabase_client.list_objects("new_bucket", path="folder1")
+>>> st_supabase_client.list_objects("new_bucket", path="folder1", ttl=0)
 [
     {
         "name": "new_test.png",
@@ -234,7 +234,7 @@ pip install st-supabase-connection
 ### :file_cabinet: Database operations
 #### Simple query 
 ```python
->>> st_supabase.query("*", from_="countries", ttl=None).execute()
+>>> st_supabase.query("*", table="countries", ttl=0).execute()
 APIResponse(
     data=[
         {"id": 1, "name": "Afghanistan"},
@@ -246,7 +246,7 @@ APIResponse(
 ```
 #### Query with join
 ```python
->>> st_supabase.query("name, teams(name)", from_="users",  count="exact", ttl=None).execute()
+>>> st_supabase.query("name, teams(name)", table="users",  count="exact", ttl="1h").execute()
 APIResponse(
     data=[
         {"name": "Kiran", "teams": [{"name": "Green"}, {"name": "Blue"}]},
@@ -257,7 +257,7 @@ APIResponse(
 ```
 #### Filter through foreign tables
 ```python
->>> st_supabase.query("name, countries(*)", count="exact", from_="cities", ttl=0).eq(
+>>> st_supabase.query("name, countries(*)", count="exact", table="cities", ttl=None).eq(
         "countries.name", "Curaçao"
     ).execute()
 
@@ -310,7 +310,7 @@ APIResponse(
 > [!INFO]  
 > Check the [Supabase Python API reference](https://supabase.com/docs/reference/python/select) for more examples.
 
-## :star: Explore all options in Streamlit
+## :star: Explore all options in a Streamlit app
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-supabase-connection.streamlit.app/)
 
 ## :bow: Acknowledgements

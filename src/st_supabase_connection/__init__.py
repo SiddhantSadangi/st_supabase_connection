@@ -5,22 +5,11 @@ from io import BytesIO
 from typing import Literal, Optional, Tuple, Union, types
 
 from postgrest import SyncSelectRequestBuilder, types
-from streamlit import cache_resource
+from streamlit import cache_data, cache_resource
 from streamlit.connections import ExperimentalBaseConnection
 from supabase import Client, create_client
 
-# TODO: Use cache_data wherever possible (pass ttl = 0 to disable caching)
-# eg
-# def get_bucket(ttl):
-#   @cache_data(ttl=ttl)
-#   def _get_bucket():
-#       return self.client.storage.get_bucket
-#   return _get_bucket
-# TODO: Add cache to benefits in readme if implemented
-# TODO: Add optional headers to storage requests
-# TODO: support additional postgrest-py methods (https://github.com/supabase-community/postgrest-py/blob/master/postgrest/_sync/request_builder.py#L177C13-L177C13)
-
-__version__ = "0.0.4"
+__version__ = "0.1.0"
 
 
 class SupabaseConnection(ExperimentalBaseConnection[Client]):
@@ -71,26 +60,23 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
 
         self.client = create_client(url, key)
         self.table = self.client.table
-        self.get_bucket = self.client.storage.get_bucket
-        self.list_buckets = self.client.storage.list_buckets
         self.delete_bucket = self.client.storage.delete_bucket
         self.empty_bucket = self.client.storage.empty_bucket
 
     def query(
         self,
         *columns: str,
-        from_: str,
+        table: str,
         count: Optional[types.CountMethod] = None,
-        ttl: Optional[Union[int, str, timedelta]] = None,
+        ttl: Optional[Union[float, timedelta, str]] = None,
     ) -> SyncSelectRequestBuilder:
-        """
-        Run a SELECT query.
+        """Run a SELECT query.
 
         Parameters
         ----------
         *columns : str
             The names of the columns to fetch.
-        from_ : str
+        table : str
             The table to run the query on.
         count : str
             The method to use to get the count of rows returned. Defaults to `None`.
@@ -98,13 +84,50 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
             The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
         """
 
-        @cache_resource(
-            ttl=ttl
-        )  # The return object is not serializable. This behaviour was retained to let users chain operations to the query
-        def _query(_self, *columns, from_, count):
-            return _self.client.table(from_).select(*columns, count=count)
+        @cache_resource(ttl=ttl)
+        def _query(_self, *columns, table, count):
+            return _self.client.table(table).select(*columns, count=count)
 
-        return _query(self, *columns, from_=from_, count=count)
+        return _query(self, *columns, table=table, count=count)
+
+    def get_bucket(
+        self,
+        bucket_id: str,
+        ttl: Optional[Union[float, timedelta, str]] = None,
+    ):
+        """Retrieves the details of an existing storage bucket.
+
+        Parameters
+        ----------
+        bucket_id : str
+            Unique identifier of the bucket you would like to retrieve.
+        ttl : float, timedelta, str, or None
+            The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
+        """
+
+        @cache_resource(ttl=ttl)
+        def _get_bucket(_self, bucket_id):
+            return _self.client.storage.get_bucket(bucket_id)
+
+        return _get_bucket(self, bucket_id)
+
+    def list_buckets(
+        self,
+        ttl: Optional[Union[float, timedelta, str]] = None,
+    ) -> list:
+        """Retrieves the details of all storage buckets within an existing product.
+
+        Parameters
+        ----------
+        ttl : float, timedelta, str, or None
+            The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
+        """
+
+        @cache_resource(ttl=ttl)
+        def _list_buckets(_self):
+            return _self.client.storage.list_buckets()
+
+        return _list_buckets(self)
 
     def create_bucket(
         self,
@@ -114,8 +137,7 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         file_size_limit: Optional[int] = None,
         allowed_mime_types: Optional[list[str]] = None,
     ) -> dict[str, str]:
-        """
-        Creates a new storage bucket.
+        """Creates a new storage bucket.
 
         Parameters
         ----------
@@ -144,8 +166,7 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         return response.json()
 
     def upload(self, bucket_id: str, file: BytesIO, destination_path: str) -> dict[str, str]:
-        """
-        Uploads a file to a Supabase bucket.
+        """Uploads a file to a Supabase bucket.
 
         Parameters
         ----------
@@ -170,9 +191,9 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         self,
         bucket_id: str,
         source_path: str,
+        ttl: Optional[Union[float, timedelta, str]] = None,
     ) -> Tuple[str, str, bytes]:
-        """
-        Downloads a file.
+        """Downloads a file.
 
         Parameters
         ----------
@@ -180,6 +201,8 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
             Unique identifier of the bucket.
         source_path : str
             Path of the file relative in the bucket, including file name
+        ttl : float, timedelta, str, or None
+            The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
 
         Returns
         -------
@@ -192,16 +215,20 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         """
         import mimetypes
 
-        file_name = source_path.split("/")[-1]
+        @cache_resource(ttl=ttl)
+        def _download(_self, bucket_id, source_path):
+            file_name = source_path.split("/")[-1]
 
-        with open(file_name, "wb+") as f:
-            response = self.client.storage.from_(bucket_id).download(source_path)
-            f.write(response)
+            with open(file_name, "wb+") as f:
+                response = _self.client.storage.from_(bucket_id).download(source_path)
+                f.write(response)
 
-        mime = mimetypes.guess_type(file_name)[0]
-        data = open(file_name, "rb")
+            mime = mimetypes.guess_type(file_name)[0]
+            data = open(file_name, "rb")
 
-        return file_name, mime, data
+            return file_name, mime, data
+
+        return _download(self, bucket_id, source_path)
 
     def update_bucket(
         self,
@@ -210,8 +237,7 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         file_size_limit: Optional[bool] = None,
         allowed_mime_types: Optional[Union[str, list[str]]] = None,
     ) -> dict[str, str]:
-        """
-        Update a storage bucket.
+        """Update a storage bucket.
 
         Parameters
         ----------
@@ -235,8 +261,7 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         return response.json()
 
     def move(self, bucket_id: str, from_path: str, to_path: str) -> dict[str, str]:
-        """
-        Moves an existing file, optionally renaming it at the same time.
+        """Moves an existing file, optionally renaming it at the same time.
 
         Parameters
         ----------
@@ -259,8 +284,7 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         return response.json()
 
     def remove(self, bucket_id: str, paths: list) -> dict[str, str]:
-        """
-        Deletes files within the same bucket
+        """Deletes files within the same bucket
 
         Parameters
         ----------
@@ -284,9 +308,9 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         offset: int = 0,
         sortby: Optional[Literal["name", "updated_at", "created_at", "last_accessed_at"]] = "name",
         order: Optional[Literal["asc", "desc"]] = "asc",
+        ttl: Optional[Union[float, timedelta, str]] = None,
     ) -> list[dict[str, str]]:
-        """
-        Lists all the objects within a bucket.
+        """Lists all the objects within a bucket.
 
         Parameters
         ----------
@@ -302,15 +326,22 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
             The column name to sort by by. Defaults to "name".
         order : str
             The sorting order. Defaults to "asc".
+        ttl : float, timedelta, str, or None
+            The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
         """
-        return self.client.storage.from_(bucket_id).list(
-            path,
-            dict(
-                limit=limit,
-                offset=offset,
-                sortBy=dict(column=sortby, order=order),
-            ),
-        )
+
+        @cache_data(ttl=ttl)
+        def _list_objects(_self, bucket_id, path, limit, offset, sortby, order):
+            return _self.client.storage.from_(bucket_id).list(
+                path,
+                dict(
+                    limit=limit,
+                    offset=offset,
+                    sortBy=dict(column=sortby, order=order),
+                ),
+            )
+
+        return _list_objects(self, bucket_id, path, limit, offset, sortby, order)
 
     def create_signed_urls(
         self,
@@ -318,8 +349,7 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         paths: list[str],
         expires_in: int,
     ) -> list[dict[str, str]]:
-        """
-        Parameters
+        """Parameters
         ----------
         bucket_id : str
             Unique identifier of the bucket.
@@ -348,23 +378,26 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         self,
         bucket_id: str,
         filepath: str,
+        ttl: Optional[Union[float, timedelta, str]] = None,
     ) -> str:
-        """
-        Parameters
+        """Parameters
         ----------
         bucket_id : str
             Unique identifier of the bucket.
         filepath : str
             File path to be downloaded, including the current file name.
+        ttl : float, timedelta, str, or None
+            The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
         """
 
-        return self.client.storage.from_(bucket_id).get_public_url(filepath)
+        @cache_data(ttl)
+        def _get_public_url(_self, bucket_id, filepath):
+            return _self.client.storage.from_(bucket_id).get_public_url(filepath)
+
+        return _get_public_url(self, bucket_id, filepath)
 
     def create_signed_upload_url(self, bucket_id: str, path: str) -> dict[str, str]:
-        """
-        Creates a signed upload URL.
-
-        Parameters
+        """Parameters
         ----------
         bucket_id : str
             Unique identifier of the bucket.
@@ -398,8 +431,7 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         token: str,
         file: BytesIO,
     ) -> dict[str, str]:
-        """
-        Upload a file with a token generated from `.create_signed_url()`
+        """Upload a file with a token generated from `.create_signed_url()`
 
         Parameters
         ----------

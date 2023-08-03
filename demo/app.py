@@ -1,5 +1,6 @@
 import contextlib
 
+import pandas as pd
 import streamlit as st
 
 from st_supabase_connection import SupabaseConnection, __version__
@@ -7,7 +8,7 @@ from st_supabase_connection import SupabaseConnection, __version__
 VERSION = __version__
 
 st.set_page_config(
-    page_title="Streamlit SupabaseConnection Demo app",
+    page_title="st_supabase_connection",
     page_icon="🔌",
     menu_items={
         "About": f"🔌 Streamlit Supabase Connection v{VERSION}  "
@@ -89,10 +90,20 @@ with st.sidebar:
                 5. The app will construct the statement for that you can copy and use in your own app.
                 """
         )
+
+    if st.button(
+        "Clear the cache to fetch latest data🧹",
+        use_container_width=True,
+        type="primary",
+    ):
+        st.cache_data.clear()
+        st.cache_resource.clear()
+        st.success("Cache cleared")
+
     st.components.v1.html(sidebar_html, height=600)
 
 # ---------- MAIN PAGE ----------
-st.header("🔌Streamlit SupabaseConnection Demo")
+st.header("🔌Supabase Connection for Streamlit")
 
 st.write("📖 Demo and tutorial for `st_supabase_connection` for Supabase Storage and Database.")
 
@@ -102,10 +113,14 @@ with st.expander("**Select project**", expanded=not st.session_state["initialize
     demo_tab, custom_tab = st.tabs(["👶Use demo project", "🫅Use your own project"])
 
     with demo_tab:
-        st.info(
-            "Limited data and operations",
-            icon="⚠️",
+        ttl = st.text_input(
+            "Connection cache duration",
+            value="",
+            placeholder="Optional",
+            help="This does not affect results caching. Leave blank to cache indefinitely.",
         )
+        ttl = None if ttl == "" else ttl
+
         if st.button(
             "Initialize client ⚡",
             type="primary",
@@ -113,8 +128,7 @@ with st.expander("**Select project**", expanded=not st.session_state["initialize
         ):
             try:
                 st.session_state["client"] = st.experimental_connection(
-                    name="supabase_connection",
-                    type=SupabaseConnection,
+                    name="supabase_connection", type=SupabaseConnection, ttl=ttl
                 )
                 st.session_state["initialized"] = True
                 st.session_state["project"] = "demo"
@@ -128,9 +142,9 @@ with st.expander("**Select project**", expanded=not st.session_state["initialize
 
             st.write("A connection is initialized as")
             st.code(
-                """
+                f"""
                 st_supabase = st.experimental_connection(
-                    name="supabase_connection", type=SupabaseConnection
+                    name="supabase_connection", type=SupabaseConnection, {ttl=}
                     )
                 """,
                 language="python",
@@ -138,7 +152,15 @@ with st.expander("**Select project**", expanded=not st.session_state["initialize
 
     with custom_tab:
         with st.form(key="credentials"):
-            url = st.text_input("Enter Supabase URL")
+            lcol, rcol = st.columns([2, 1])
+            url = lcol.text_input("Enter Supabase URL")
+            ttl = rcol.text_input(
+                "Connection cache duration",
+                value="",
+                placeholder="Optional",
+                help="This does not affect results caching. Leave blank to cache indefinitely",
+            )
+            ttl = None if ttl == "" else ttl
             key = st.text_input("Enter Supabase key", type="password")
 
             if st.form_submit_button(
@@ -150,6 +172,7 @@ with st.expander("**Select project**", expanded=not st.session_state["initialize
                     st.session_state["client"] = st.experimental_connection(
                         name="supabase_connection",
                         type=SupabaseConnection,
+                        ttl=ttl,
                         url=url,
                         key=key,
                     )
@@ -165,10 +188,14 @@ with st.expander("**Select project**", expanded=not st.session_state["initialize
 
                 st.write("A connection is initialized as")
                 st.code(
-                    """
+                    f"""
                     st_supabase = st.experimental_connection(
-                        name="supabase_connection", type=SupabaseConnection, url=url, key=key
-                        )
+                        name="supabase_connection", 
+                        type=SupabaseConnection, 
+                        {ttl=},
+                        url=url, 
+                        key=key, 
+                    )
                     """,
                     language="python",
                 )
@@ -217,12 +244,23 @@ if st.session_state["initialized"]:
 
         bucket_id = rcol.text_input(
             "Enter the bucket id",
-            placeholder="my_bucket" if operation != "update_bucket" else "",
+            placeholder="Required" if operation != "list_buckets" else "",
             disabled=operation == "list_buckets",
             help="The unique identifier for the bucket",
         )
 
-        if operation in ["delete_bucket", "empty_bucket", "get_bucket"]:
+        if operation == "get_bucket":
+            ttl = st.text_input(
+                "Results cache duration",
+                value="",
+                placeholder="Optional",
+                help="This does not affect results caching. Leave blank to cache indefinitely",
+            )
+            ttl = None if ttl == "" else ttl
+            constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}", {ttl=})"""
+            st.session_state["storage_disabled"] = False if bucket_id else True
+
+        elif operation in ["delete_bucket", "empty_bucket"]:
             constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}")"""
             st.session_state["storage_disabled"] = False if bucket_id else True
 
@@ -314,17 +352,32 @@ if st.session_state["initialized"]:
             """
 
         elif operation == "list_buckets":
-            constructed_storage_query = f"""st_supabase.{operation}()"""
+            ttl = st.text_input(
+                "Results cache duration",
+                value="",
+                placeholder="Optional",
+                help="This does not affect results caching. Leave blank to cache indefinitely",
+            )
+            ttl = None if ttl == "" else ttl
+            constructed_storage_query = f"""st_supabase.{operation}({ttl=})"""
             st.session_state["storage_disabled"] = False
 
         elif operation == "download":
-            source_path = st.text_input(
+            lcol, rcol = st.columns([3, 1])
+            source_path = lcol.text_input(
                 "Enter source path in the bucket",
                 placeholder="/folder/subFolder/file.txt",
             )
+            ttl = rcol.text_input(
+                "Results cache duration",
+                value="",
+                placeholder="Optional",
+                help="This does not affect results caching. Leave blank to cache indefinitely",
+            )
+            ttl = None if ttl == "" else ttl
 
             constructed_storage_query = (
-                f"""st_supabase.{operation}("{bucket_id}", {source_path=})"""
+                f"""st_supabase.{operation}("{bucket_id}", {source_path=}, {ttl=})"""
             )
             st.session_state["storage_disabled"] = False if all([bucket_id, source_path]) else True
 
@@ -355,10 +408,18 @@ if st.session_state["initialized"]:
 
             st.session_state["storage_disabled"] = False if all([bucket_id, paths]) else True
         elif operation == "list_objects":
-            path = st.text_input(
+            lcol, rcol = st.columns([3, 1])
+            path = lcol.text_input(
                 "Enter the folder path to list objects from",
                 placeholder="/folder/subFolder/",
             )
+            ttl = rcol.text_input(
+                "Results cache duration",
+                value="",
+                placeholder="Optional",
+                help="This does not affect results caching. Leave blank to cache indefinitely",
+            )
+            ttl = None if ttl == "" else ttl
 
             col1, col2, col3, col4 = st.columns(4)
 
@@ -387,17 +448,27 @@ if st.session_state["initialized"]:
                 horizontal=True,
             )
 
-            constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}", {path=}, {limit=}, {offset=}, {sortby=}, {order=})"""
+            constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}", {path=}, {limit=}, {offset=}, {sortby=}, {order=}, {ttl=})"""
 
             st.session_state["storage_disabled"] = False if bucket_id else True
 
         elif operation == "get_public_url":
-            filepath = st.text_input(
+            lcol, rcol = st.columns([3, 1])
+            filepath = lcol.text_input(
                 "Enter the path to file",
                 placeholder="/folder/subFolder/image.jpg",
             )
+            ttl = rcol.text_input(
+                "Results cache duration",
+                value="",
+                placeholder="Optional",
+                help="This does not affect results caching. Leave blank to cache indefinitely",
+            )
+            ttl = None if ttl == "" else ttl
 
-            constructed_storage_query = f"""st_supabase.get_public_url("{bucket_id}",{filepath=})"""
+            constructed_storage_query = (
+                f"""st_supabase.get_public_url("{bucket_id}",{filepath=}, {ttl=})"""
+            )
             st.session_state["storage_disabled"] = False if all([bucket_id, filepath]) else True
 
         elif operation == "create_signed_urls":
@@ -538,7 +609,8 @@ if st.session_state["initialized"]:
                         st.write(response)
                     elif operation == "list_objects":
                         st.info(f"Listing **{len(response)}** objects")
-                        st.write(response)
+                        _df = pd.DataFrame.from_dict(response)
+                        st.dataframe(_df, use_container_width=True)
                     elif operation == "get_public_url":
                         st.success(response, icon="🔗")
                     elif operation == "create_signed_urls":
@@ -659,12 +731,12 @@ if st.session_state["initialized"]:
             request_builder_query_label = "Enter the columns to fetch as comma-separated strings"
             placeholder = value = "*"
             ttl = rcol_placeholder.text_input(
-                "Enter cache expiry duration",
+                "Result cache duration",
                 value=0,
                 placeholder=None,
                 help="Set as `0` to always fetch the latest results, and leave blank to cache indefinitely.",
             )
-            ttl = None if ttl == "" else ttl
+            placeholder = value = "*"
         elif request_builder == "delete":
             request_builder_query_label = "Delete query"
             placeholder = value = "Delete does not take a request builder query"
@@ -715,14 +787,18 @@ if st.session_state["initialized"]:
 
             operators = operators.replace(".__init__()", "").replace(".execute()", "")
 
+        ttl = None if ttl == "" else ttl
+
         if operators:
             if request_builder == "select":
-                constructed_db_query = f"""st_supabase.query({request_builder_query}, from_="{table}", {ttl=}){operators}.execute()"""
+                constructed_db_query = f"""st_supabase.query({request_builder_query}, {table=}, {ttl=}){operators}.execute()"""
             else:
                 constructed_db_query = f"""st_supabase.table("{table}").{request_builder}({request_builder_query}){operators}.execute()"""
         else:
             if request_builder == "select":
-                constructed_db_query = f"""st_supabase.query({request_builder_query}, from_="{table}", {ttl=}).execute()"""
+                constructed_db_query = (
+                    f"""st_supabase.query({request_builder_query}, {table=}, {ttl=}).execute()"""
+                )
             else:
                 constructed_db_query = f"""st_supabase.table("{table}").{request_builder}({request_builder_query}).execute()"""
         st.write("**Constructed statement**")
@@ -751,7 +827,9 @@ if st.session_state["initialized"]:
                 data, count = eval(constructed_db_query)
 
                 if count_method:
-                    st.write(f"{count[-1]} rows {request_builder}ed")
+                    st.write(
+                        f"**{count[-1]}** rows {request_builder}ed. `count` does not take `limit` into account."
+                    )
                 if view == "Dataframe":
                     st.dataframe(data[-1], use_container_width=True)
                 else:
