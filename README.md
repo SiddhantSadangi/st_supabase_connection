@@ -119,7 +119,7 @@ A Streamlit connection component to connect Streamlit to Supabase Storage and Da
 
   </details>
 
-## :computer: Demo app
+## :computer: Learn how to use this in a demo app
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-supabase-connection.streamlit.app/)
 
 
@@ -310,7 +310,7 @@ APIResponse(
 > [!NOTE]  
 > Check the [Supabase Python API reference](https://supabase.com/docs/reference/python/select) for more examples.
 
-## :star: Explore all options in a Streamlit app
+## :star: Explore all options in a demo app
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-supabase-connection.streamlit.app/)
 
 ## :bow: Acknowledgements
