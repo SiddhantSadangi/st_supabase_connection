@@ -132,7 +132,7 @@ pip install st-supabase-connection
 ```
 2. Set the `SUPABASE_URL` and `SUPABASE_KEY` Streamlit secrets as described [here](https://docs.streamlit.io/streamlit-community-cloud/get-started/deploy-an-app/connect-to-data-sources/secrets-management).
 
-> [!INFO]  
+> [!NOTE]  
 > For local development outside Streamlit, you can also set these as your environment variables (recommended), or pass these to the `url` and `key` args of `st.experimental_connection()` (not recommended).
 
 ## :pen: Usage
@@ -307,7 +307,7 @@ APIResponse(
     count=None,
 )
 ```
-> [!INFO]  
+> [!NOTE]  
 > Check the [Supabase Python API reference](https://supabase.com/docs/reference/python/select) for more examples.
 
 ## :star: Explore all options in a Streamlit app
