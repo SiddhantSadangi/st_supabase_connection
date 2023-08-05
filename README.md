@@ -5,7 +5,7 @@ A Streamlit connection component to connect Streamlit to Supabase Storage and Da
 ## :thinking: Why use this?
 - [X] Cache functionality to cache returned results. **Save time and money** on your API requests
 - [X] Same method names as the Supabase Python API. **Minimum relearning required**
-- [X] Built on top of [`storage-py`](https://github.com/supabase-community/storage-py) and **exposes more methods** than currently supported by the Supabase Python API. For example, `update()`, `create_signed_upload_url()`, and `upload_to_signed_url()`
+- [X] **Exposes more storage methods** than currently supported by the Supabase Python API. For example, `update()`, `create_signed_upload_url()`, and `upload_to_signed_url()`
 - [X] **Less keystrokes required** when integrating with your Streamlit app.
 
   <details close>
