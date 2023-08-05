@@ -84,10 +84,9 @@ with st.sidebar:
         st.info(
             """
                 1. Select a project and initialize client
-                2. Choose if you want to explore Supabase Storage or Database
-                3. Select the relevant operation and options
-                4. Run the query to get the results 
-                5. The app will construct the statement for that you can copy and use in your own app.
+                2. Select the relevant DB or Storage operation and options
+                3. Run the query to get the results 
+                4. Copy the constructed statement to use in your own app.
                 """
         )
 
