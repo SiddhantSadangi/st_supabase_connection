@@ -337,9 +337,12 @@ if st.session_state["initialized"]:
             destination_path = None
             uploaded_file = st.file_uploader("Choose a file")
             if uploaded_file:
-                destination_path = st.text_input(
-                    "Enter destination path in the bucket",
-                    placeholder=uploaded_file.name,
+                destination_path = (
+                    st.text_input(
+                        "Enter destination path in the bucket",
+                        placeholder=uploaded_file.name,
+                    )
+                    or uploaded_file.name
                 )
 
                 st.session_state["storage_disabled"] = (
