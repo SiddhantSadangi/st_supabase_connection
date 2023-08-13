@@ -1,7 +1,9 @@
+import mimetypes
 import os
 import urllib
 from datetime import timedelta
 from io import BytesIO
+from pathlib import Path
 from typing import Literal, Optional, Tuple, Union, types
 
 from postgrest import SyncSelectRequestBuilder, types
@@ -9,7 +11,7 @@ from streamlit import cache_data, cache_resource
 from streamlit.connections import ExperimentalBaseConnection
 from supabase import Client, create_client
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 
 class SupabaseConnection(ExperimentalBaseConnection[Client]):
@@ -165,26 +167,46 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         )
         return response.json()
 
-    def upload(self, bucket_id: str, file: BytesIO, destination_path: str) -> dict[str, str]:
+    def upload(
+        self,
+        bucket_id: str,
+        source: Literal["local", "hosted"],
+        file: Union[str, Path, BytesIO],
+        destination_path: str,
+    ) -> dict[str, str]:
         """Uploads a file to a Supabase bucket.
 
         Parameters
         ----------
         bucket_id : str
             Unique identifier of the bucket.
-        file : BytesIO
-            File to upload. This BytesIO object returned by `st.file_uploader()`.
+        source : str
+            "local" to upload file from your local filesystem,
+            "hosted" to upload file from the Streamlit hosted filesystem.
+        file : str, Path, BytesIO
+            File to upload. This can be a path of the file if `source="hosted"`,
+            or the `BytesIO` object returned by `st.file_uploader()` if `source="local"`.
         destination_path : str
-            Path is the bucket where the file will be uploaded to. Folders will be created as needed. Defaults to `/filename.ext`
+            Path is the bucket where the file will be uploaded to.
+            Folders will be created as needed. Defaults to `/filename.fileext`
         """
-        with open(file.name, "wb") as f:
-            f.write(file.getbuffer())
-        with open(file.name, "rb") as f:
-            response = self.client.storage.from_(bucket_id).upload(
-                path=destination_path or f"/{file.name}",
-                file=f,
-                file_options={"content-type": file.type},
-            )
+
+        if source == "local":
+            with open(file.name, "wb") as f:
+                f.write(file.getbuffer())
+            with open(file.name, "rb") as f:
+                response = self.client.storage.from_(bucket_id).upload(
+                    path=destination_path or f"/{file.name}",
+                    file=f,
+                    file_options={"content-type": file.type},
+                )
+        elif source == "hosted":
+            with open(file, "rb") as f:
+                response = self.client.storage.from_(bucket_id).upload(
+                    path=destination_path or f"/{os.path.basename(f.name)}",
+                    file=f,
+                    file_options={"content-type": mimetypes.guess_type(file)[0]},
+                )
         return response.json()
 
     def download(
@@ -213,7 +235,6 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         data : bytes
             Downloaded bytes object
         """
-        import mimetypes
 
         @cache_resource(ttl=ttl)
         def _download(_self, bucket_id, source_path):
