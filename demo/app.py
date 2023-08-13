@@ -19,7 +19,7 @@ st.set_page_config(
 )
 
 # ---------- INIT SESSION ----------
-upsert = operators = bucket_id = file_size_limit = allowed_mime_types = None
+upsert = operators = bucket_id = file_size_limit = allowed_mime_types = source = None
 public = False
 
 STORAGE_OPERATIONS = [
@@ -253,7 +253,7 @@ if st.session_state["initialized"]:
                 "Results cache duration",
                 value="",
                 placeholder="Optional",
-                help="This does not affect results caching. Leave blank to cache indefinitely",
+                help="Leave blank to cache indefinitely",
             )
             ttl = None if ttl == "" else ttl
             constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}", {ttl=})"""
@@ -335,30 +335,45 @@ if st.session_state["initialized"]:
 
         elif operation == "upload":
             destination_path = None
-            uploaded_file = st.file_uploader("Choose a file")
-            if uploaded_file:
-                destination_path = (
-                    st.text_input(
-                        "Enter destination path in the bucket",
-                        placeholder=uploaded_file.name,
+            lcol, rcol = st.columns([1, 3])
+            source = lcol.selectbox(
+                label="Source filesystem",
+                options=["local", "hosted"],
+                help="Filesystem from where the file has to be uploaded",
+            )
+
+            if source == "local":
+                file = rcol.file_uploader("Choose a file")
+                if file:
+                    destination_path = st.text_input(
+                        "Destination path in the bucket",
+                        value=file.name,
                     )
-                    or uploaded_file.name
-                )
 
-                st.session_state["storage_disabled"] = (
-                    False if all([bucket_id, uploaded_file]) else True
+                constructed_storage_query = f"""
+                st_supabase.{operation}("{bucket_id}", {source=}, file={file}, destination_path="{destination_path}")
+                # `UploadedFile` is the `BytesIO` object returned by `st.file_uploader()`
+                """
+            else:
+                file = rcol.text_input(
+                    "Source path",
+                    placeholder="path/to/file.txt",
+                    help="This is the path of the file on the Streamlit hosted filesystem",
                 )
-            constructed_storage_query = f"""
-            st_supabase.{operation}("{bucket_id}", file={uploaded_file}, destination_path="{destination_path}")
-            # `UploadedFile` is the `BytesIO` object returned by `st.file_uploader()`
-            """
-
+                destination_path = st.text_input(
+                    "Destination path in the bucket",
+                    value=file,
+                )
+                constructed_storage_query = f"""
+                st_supabase.{operation}("{bucket_id}", {source=}, {file=}, destination_path="{destination_path}")
+                """
+            st.session_state["storage_disabled"] = False if all([bucket_id, file]) else True
         elif operation == "list_buckets":
             ttl = st.text_input(
                 "Results cache duration",
                 value="",
                 placeholder="Optional",
-                help="This does not affect results caching. Leave blank to cache indefinitely",
+                help="Leave blank to cache indefinitely",
             )
             ttl = None if ttl == "" else ttl
             constructed_storage_query = f"""st_supabase.{operation}({ttl=})"""
@@ -374,7 +389,7 @@ if st.session_state["initialized"]:
                 "Results cache duration",
                 value="",
                 placeholder="Optional",
-                help="This does not affect results caching. Leave blank to cache indefinitely",
+                help="Leave blank to cache indefinitely",
             )
             ttl = None if ttl == "" else ttl
 
@@ -419,7 +434,7 @@ if st.session_state["initialized"]:
                 "Results cache duration",
                 value="",
                 placeholder="Optional",
-                help="This does not affect results caching. Leave blank to cache indefinitely",
+                help="Leave blank to cache indefinitely",
             )
             ttl = None if ttl == "" else ttl
 
@@ -464,7 +479,7 @@ if st.session_state["initialized"]:
                 "Results cache duration",
                 value="",
                 placeholder="Optional",
-                help="This does not affect results caching. Leave blank to cache indefinitely",
+                help="Leave blank to cache indefinitely",
             )
             ttl = None if ttl == "" else ttl
 
@@ -505,26 +520,39 @@ if st.session_state["initialized"]:
 
         elif operation == "upload_to_signed_url":
             path = None
-            uploaded_file = st.file_uploader("Choose a file")
-            if uploaded_file:
-                path = st.text_input(
-                    "Enter destination path in the bucket",
-                    placeholder="/folder/subFolder/image.jpg",
-                )
+            path = st.text_input(
+                "Enter destination path in the bucket",
+                placeholder="/folder/subFolder/image.jpg",
+            )
+            token = st.text_input(
+                "Enter the token",
+                type="password",
+                help="This is generated by `.create_signed_url()`",
+            )
+            lcol, rcol = st.columns([1, 3])
+            source = lcol.selectbox(
+                label="Source filesystem",
+                options=["local", "hosted"],
+                help="Filesystem from where the file has to be uploaded",
+            )
 
-                token = st.text_input(
-                    "Enter the token",
-                    type="password",
-                    help="This is generated by `.create_signed_url()`",
-                )
+            if source == "local":
+                file = rcol.file_uploader("Choose a file")
 
-                st.session_state["storage_disabled"] = (
-                    False if all([bucket_id, token, path]) else True
+                constructed_storage_query = f"""
+                st_supabase.{operation}("{bucket_id}", {source=}, {path=}, token="***", file={file})
+                # `UploadedFile` is the `BytesIO` object returned by `st.file_uploader()`
+                """
+            elif source == "hosted":
+                file = rcol.text_input(
+                    "Source path",
+                    placeholder="path/to/file.txt",
+                    help="This is the path of the file on the Streamlit hosted filesystem",
                 )
-            constructed_storage_query = f"""
-            st_supabase.{operation}("{bucket_id}", {path=}, token="***", file={uploaded_file})
-            # `UploadedFile` is the `BytesIO` object returned by `st.file_uploader()`
-            """
+                constructed_storage_query = f"""
+                st_supabase.{operation}("{bucket_id}", {source=}, {path=}, token="***", {file=})
+                """
+            st.session_state["storage_disabled"] = False if all([bucket_id, token, path]) else True
 
         st.write("**Constructed statement**")
         if operation == "download":
@@ -558,12 +586,14 @@ if st.session_state["initialized"]:
         ):
             try:
                 if operation == "upload":
-                    response = st_supabase.upload(bucket_id, uploaded_file, destination_path)
+                    response = st_supabase.upload(bucket_id, source, file, destination_path)
                 elif operation == "download":
                     file_name, mime, data = eval(constructed_storage_query)
-                    st.success("Download ready 🎉🎉🎉")
+                    st.success(
+                        f"File **{file_name}** downloaded from Supabase to Streamlit hosted filesystem"
+                    )
                     st.download_button(
-                        "Download file ⏬",
+                        "Download to local filesystem ⏬",
                         data=data,
                         file_name=file_name,
                         mime=mime,
@@ -571,7 +601,7 @@ if st.session_state["initialized"]:
                     )
                 elif operation == "upload_to_signed_url":
                     response = st_supabase.upload_to_signed_url(
-                        bucket_id, path, token, uploaded_file
+                        bucket_id, source, path, token, file
                     )
                 else:
                     response = eval(constructed_storage_query)
@@ -602,10 +632,16 @@ if st.session_state["initialized"]:
                         operation == "upload"
                         and response["Key"] == f"{bucket_id}/{destination_path.lstrip('/')}"
                     ):
-                        st.success(
-                            f"Uploaded **{uploaded_file.name}** to **{response['Key']}**",
-                            icon="✅",
-                        )
+                        try:
+                            st.success(
+                                f"Uploaded **{file.name}** to **{response['Key']}**",
+                                icon="✅",
+                            )
+                        except AttributeError:
+                            st.success(
+                                f"Uploaded **{file}** to **{response['Key']}**",
+                                icon="✅",
+                            )
                     elif operation == "remove":
                         st.info(f"Removed **{len(response)}** objects")
                         st.write(response)
@@ -638,10 +674,16 @@ if st.session_state["initialized"]:
                         st.code(response["path"])
                     elif operation == "upload_to_signed_url":
                         if response["Key"] == f"{bucket_id}/{path.lstrip('/')}":
-                            st.success(
-                                f"Uploaded **{uploaded_file.name}** to **{response['Key']}**",
-                                icon="✅",
-                            )
+                            try:
+                                st.success(
+                                    f"Uploaded **{file.name}** to **{response['Key']}**",
+                                    icon="✅",
+                                )
+                            except AttributeError:
+                                st.success(
+                                    f"Uploaded **{file}** to **{response['Key']}**",
+                                    icon="✅",
+                                )
                     else:
                         st.write(response)
             except Exception as e:

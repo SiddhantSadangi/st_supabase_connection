@@ -1,7 +1,9 @@
+import mimetypes
 import os
 import urllib
 from datetime import timedelta
 from io import BytesIO
+from pathlib import Path
 from typing import Literal, Optional, Tuple, Union, types
 
 from postgrest import SyncSelectRequestBuilder, types
@@ -9,7 +11,7 @@ from streamlit import cache_data, cache_resource
 from streamlit.connections import ExperimentalBaseConnection
 from supabase import Client, create_client
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 
 class SupabaseConnection(ExperimentalBaseConnection[Client]):
@@ -165,26 +167,47 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         )
         return response.json()
 
-    def upload(self, bucket_id: str, file: BytesIO, destination_path: str) -> dict[str, str]:
+    # TODO: Support overwriting existing files
+    def upload(
+        self,
+        bucket_id: str,
+        source: Literal["local", "hosted"],
+        file: Union[str, Path, BytesIO],
+        destination_path: str,
+    ) -> dict[str, str]:
         """Uploads a file to a Supabase bucket.
 
         Parameters
         ----------
         bucket_id : str
             Unique identifier of the bucket.
-        file : BytesIO
-            File to upload. This BytesIO object returned by `st.file_uploader()`.
+        source : str
+            "local" to upload file from your local filesystem,
+            "hosted" to upload file from the Streamlit hosted filesystem.
+        file : str, Path, BytesIO
+            File to upload. This can be a path of the file if `source="hosted"`,
+            or the `BytesIO` object returned by `st.file_uploader()` if `source="local"`.
         destination_path : str
-            Path is the bucket where the file will be uploaded to. Folders will be created as needed. Defaults to `/filename.ext`
+            Path is the bucket where the file will be uploaded to.
+            Folders will be created as needed. Defaults to `/filename.fileext`
         """
-        with open(file.name, "wb") as f:
-            f.write(file.getbuffer())
-        with open(file.name, "rb") as f:
-            response = self.client.storage.from_(bucket_id).upload(
-                path=destination_path or f"/{file.name}",
-                file=f,
-                file_options={"content-type": file.type},
-            )
+
+        if source == "local":
+            with open(file.name, "wb") as f:
+                f.write(file.getbuffer())
+            with open(file.name, "rb") as f:
+                response = self.client.storage.from_(bucket_id).upload(
+                    path=destination_path or f"/{file.name}",
+                    file=f,
+                    file_options={"content-type": file.type},
+                )
+        elif source == "hosted":
+            with open(file, "rb") as f:
+                response = self.client.storage.from_(bucket_id).upload(
+                    path=destination_path or f"/{os.path.basename(f.name)}",
+                    file=f,
+                    file_options={"content-type": mimetypes.guess_type(file)[0]},
+                )
         return response.json()
 
     def download(
@@ -213,7 +236,6 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         data : bytes
             Downloaded bytes object
         """
-        import mimetypes
 
         @cache_resource(ttl=ttl)
         def _download(_self, bucket_id, source_path):
@@ -424,12 +446,14 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
             "path": path,
         }
 
+    # TODO: Support overwriting existing files
     def upload_to_signed_url(
         self,
         bucket_id: str,
+        source: Literal["local", "hosted"],
         path: str,
         token: str,
-        file: BytesIO,
+        file: Union[str, Path, BytesIO],
     ) -> dict[str, str]:
         """Upload a file with a token generated from `.create_signed_url()`
 
@@ -437,12 +461,16 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         ----------
         bucket_id : str
             Unique identifier of the bucket.
+        source : str
+            "local" to upload file from your local filesystem,
+            "hosted" to upload file from the Streamlit hosted filesystem.
         path : str
             The file path, including the file name. This path will be created if it does not exist.
         token : str
-            The token generated from `.create_signed_url()`.
-        file : BytesIO
-            File to upload. This BytesIO object returned by `st.file_uploader()`.
+            The token generated from `.create_signed_url()` for the specified `path`
+        file : str, Path, BytesIO
+            File to upload. This can be a path of the file if `source="hosted"`,
+            or the `BytesIO` object returned by `st.file_uploader()` if `source="local"`.
         """
         _path = self.client.storage.from_(bucket_id)._get_final_path(path)
         _url = urllib.parse.urlparse(f"/object/upload/sign/{_path}")
@@ -450,11 +478,22 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         final_url = f"{_url.geturl()}?{query_params}"
 
         filename = path.rsplit("/", maxsplit=1)[-1]
-        _file = {"file": (filename, file, file.type)}
 
-        response = self.client.storage.from_(bucket_id)._request(
-            "PUT",
-            final_url,
-            files=_file,
-        )
+        if source == "local":
+            _file = {"file": (filename, file, file.type)}
+            response = self.client.storage.from_(bucket_id)._request(
+                "PUT",
+                final_url,
+                files=_file,
+            )
+        elif source == "hosted":
+            # FIXME: Uploads 0 byte file
+            with open(file, "rb") as f_obj:
+                _file = {"file": (filename, f_obj, mimetypes.guess_type(file)[0])}
+                response = self.client.storage.from_(bucket_id)._request(
+                    "PUT",
+                    final_url,
+                    files=_file,
+                )
+
         return response.json()
