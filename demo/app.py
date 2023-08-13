@@ -589,9 +589,11 @@ if st.session_state["initialized"]:
                     response = st_supabase.upload(bucket_id, source, file, destination_path)
                 elif operation == "download":
                     file_name, mime, data = eval(constructed_storage_query)
-                    st.success("Download ready 🎉🎉🎉")
+                    st.success(
+                        f"File **{file_name}** downloaded from Supabase to Streamlit hosted filesystem"
+                    )
                     st.download_button(
-                        "Download file ⏬",
+                        "Download to local filesystem ⏬",
                         data=data,
                         file_name=file_name,
                         mime=mime,
