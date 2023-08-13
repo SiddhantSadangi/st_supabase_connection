@@ -2,6 +2,11 @@
 [![Downloads](https://static.pepy.tech/personalized-badge/st-supabase-connection?period=total&units=international_system&left_color=black&right_color=brightgreen&left_text=Downloads)](https://pepy.tech/project/st-supabase-connection)
 
 A Streamlit connection component to connect Streamlit to Supabase Storage and Database.
+
+## :student: Interactive tutorial
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-supabase-connection.streamlit.app/)
+
+
 ## :thinking: Why use this?
 - [X] Cache functionality to cache returned results. **Save time and money** on your API requests
 - [X] Same method names as the Supabase Python API. **Minimum relearning required**
@@ -15,7 +20,7 @@ A Streamlit connection component to connect Streamlit to Supabase Storage and Da
   <tr>
   <td><b>Without connector</b></td><td><b>With connector</b></td>
   <tr>
-    <td colspan="2"> Download file from Supabase storage </td>
+    <td colspan="2"> Download file to local system from Supabase storage </td>
   <tr>
   <td valign="top">
 
@@ -67,7 +72,7 @@ A Streamlit connection component to connect Streamlit to Supabase Storage and Da
 
   </td>
   <tr>
-  <td colspan="2"> Upload file to Supabase storage </td>
+  <td colspan="2"> Upload file from local system to Supabase storage </td>
   <tr>
   <td valign="top">
 
@@ -112,17 +117,12 @@ A Streamlit connection component to connect Streamlit to Supabase Storage and Da
   destination_path = st.text_input("Enter destination path")
 
   if st.button("Upload"):
-      st_supabase_client.upload(bucket_id, uploaded_file, destination_path)
+      st_supabase_client.upload(bucket_id, "local", uploaded_file, destination_path)
   ```
   <tr>
   </table>
 
   </details>
-
-## :computer: Learn how to use this in a demo app
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-supabase-connection.streamlit.app/)
-
-
 
 ## :construction: Setup
 
@@ -152,6 +152,36 @@ pip install st-supabase-connection
   )
   ```
 3. Use in your app to query tables and files. Happy Streamlit-ing! :balloon:
+
+## :ok_hand: Supported methods
+<details close>
+<summary> Storage </summary>
+<ul>
+    <li> delete_bucket() </li>
+    <li> empty_bucket() </li>
+    <li> get_bucket() </li>
+    <li> list_buckets() </li>
+    <li> create_bucket() </li>
+    <li> upload() </li>
+    <li> download() </li>
+    <li> update_bucket() </li>
+    <li> move() </li>
+    <li> list_objects() </li>
+    <li> create_signed_urls() </li>
+    <li> get_public_url() </li>
+    <li> create_signed_upload_url() </li>
+    <li> upload_to_signed_url() </li>
+</ul> 
+
+</details>
+
+<details close>
+<summary> Database </summary>
+<ul>
+    <li> query() - Runs a cached SELECT query </li>
+    <li> All methods supported by <a href="https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html">postgrest-py</a>.
+</details>
+
 
 ## :writing_hand: Examples
 ### :package: Storage operations
@@ -186,6 +216,12 @@ pip install st-supabase-connection
 ```python
 >>> st_supabase_client.create_bucket("new_bucket")
 {'name': 'new_bucket'}
+```
+
+#### Get bucket details
+```python
+>>> st_supabase.get_bucket("new_bucket")
+SyncBucket(id='new_bucket', name='new_bucket', owner='', public=True, created_at=datetime.datetime(2023, 8, 2, 19, 41, 44, 810000, tzinfo=tzutc()), updated_at=datetime.datetime(2023, 8, 2, 19, 41, 44, 810000, tzinfo=tzutc()), file_size_limit=None, allowed_mime_types=None)
 ```
 #### Update a bucket
 ```python
@@ -225,6 +261,12 @@ pip install st-supabase-connection
         },
     }
 ]
+```
+
+#### Empty a bucket
+```python
+>>> st_supabase.empty_bucket("new_bucket")
+{'message': 'Successfully emptied'}
 ```
 #### Delete a bucket
 ```python
