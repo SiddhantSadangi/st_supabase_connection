@@ -11,7 +11,7 @@ from streamlit import cache_data, cache_resource
 from streamlit.connections import ExperimentalBaseConnection
 from supabase import Client, create_client
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 
 class SupabaseConnection(ExperimentalBaseConnection[Client]):
@@ -487,7 +487,6 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
                 files=_file,
             )
         elif source == "hosted":
-            # FIXME: Uploads 0 byte file
             with open(file, "rb") as f_obj:
                 _file = {"file": (filename, f_obj, mimetypes.guess_type(file)[0])}
                 response = self.client.storage.from_(bucket_id)._request(
