@@ -131,7 +131,7 @@ A Streamlit connection component to connect Streamlit to Supabase Storage and Da
 
   </details>
 
-## :construction: Setup
+## :hammer_and_wrench: Setup
 
 1. Install `st-supabase-connection`
 ```sh
@@ -142,7 +142,7 @@ pip install st-supabase-connection
 > [!NOTE]  
 > For local development outside Streamlit, you can also set these as your environment variables (recommended), or pass these to the `url` and `key` args of `st.experimental_connection()` (not recommended).
 
-## :pen: Usage
+## :magic_wand: Usage
 
 1. Import
   ```python
@@ -190,7 +190,7 @@ pip install st-supabase-connection
 </details>
 
 
-## :writing_hand: Examples
+## :books: Examples
 ### :package: Storage operations
 
 #### List existing buckets
