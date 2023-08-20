@@ -344,14 +344,16 @@ if st.session_state["initialized"]:
 
             if source == "local":
                 file = rcol.file_uploader("Choose a file")
-                if file:
-                    destination_path = st.text_input(
-                        "Destination path in the bucket",
-                        value=file.name,
-                    )
+                lcol, rcol = st.columns([3, 1])
+
+                destination_path = lcol.text_input(
+                    "Destination path in the bucket",
+                    value=file.name if file else "",
+                )
+                overwrite = "true" if rcol.checkbox("Overwrite if exists?") else "false"
 
                 constructed_storage_query = f"""
-                st_supabase.{operation}("{bucket_id}", {source=}, file={file}, destination_path="{destination_path}")
+                st_supabase.{operation}("{bucket_id}", {source=}, file={file}, destination_path="{destination_path}", {overwrite=})
                 # `UploadedFile` is the `BytesIO` object returned by `st.file_uploader()`
                 """
             else:
@@ -360,12 +362,14 @@ if st.session_state["initialized"]:
                     placeholder="path/to/file.txt",
                     help="This is the path of the file on the Streamlit hosted filesystem",
                 )
-                destination_path = st.text_input(
+                lcol, rcol = st.columns([3, 1])
+                destination_path = lcol.text_input(
                     "Destination path in the bucket",
                     value=file,
                 )
+                overwrite = "true" if rcol.checkbox("Overwrite if exists?") else "false"
                 constructed_storage_query = f"""
-                st_supabase.{operation}("{bucket_id}", {source=}, {file=}, destination_path="{destination_path}")
+                st_supabase.{operation}("{bucket_id}", {source=}, {file=}, destination_path="{destination_path}", {overwrite=})
                 """
             st.session_state["storage_disabled"] = False if all([bucket_id, file]) else True
         elif operation == "list_buckets":
@@ -535,12 +539,12 @@ if st.session_state["initialized"]:
                 options=["local", "hosted"],
                 help="Filesystem from where the file has to be uploaded",
             )
-
+            overwrite = "false"
             if source == "local":
                 file = rcol.file_uploader("Choose a file")
 
                 constructed_storage_query = f"""
-                st_supabase.{operation}("{bucket_id}", {source=}, {path=}, token="***", file={file})
+                st_supabase.{operation}("{bucket_id}", {source=}, {path=}, token="***", file={file}, {overwrite=})
                 # `UploadedFile` is the `BytesIO` object returned by `st.file_uploader()`
                 """
             elif source == "hosted":
@@ -550,7 +554,7 @@ if st.session_state["initialized"]:
                     help="This is the path of the file on the Streamlit hosted filesystem",
                 )
                 constructed_storage_query = f"""
-                st_supabase.{operation}("{bucket_id}", {source=}, {path=}, token="***", {file=})
+                st_supabase.{operation}("{bucket_id}", {source=}, {path=}, token="***", {file=}, {overwrite=})
                 """
             st.session_state["storage_disabled"] = False if all([bucket_id, token, path]) else True
 
@@ -563,11 +567,8 @@ if st.session_state["initialized"]:
         else:
             st.code(constructed_storage_query, language="python")
 
-        st.session_state["storage_disabled"] = (
-            True
-            if st.session_state["project"] == "demo" and operation in RESTRICTED_STORAGE_OPERATORS
-            else st.session_state["storage_disabled"]
-        )
+        if st.session_state["project"] == "demo" and operation in RESTRICTED_STORAGE_OPERATORS:
+            st.session_state["storage_disabled"] = True
 
         if st.session_state["project"] == "demo" and operation in RESTRICTED_STORAGE_OPERATORS:
             help = f"'{selected_operation.capitalize()}' not allowed in demo project"
@@ -586,7 +587,13 @@ if st.session_state["initialized"]:
         ):
             try:
                 if operation == "upload":
-                    response = st_supabase.upload(bucket_id, source, file, destination_path)
+                    response = st_supabase.upload(
+                        bucket_id,
+                        source,
+                        file,
+                        destination_path,
+                        overwrite,
+                    )
                 elif operation == "download":
                     file_name, mime, data = eval(constructed_storage_query)
                     st.success(
@@ -601,7 +608,12 @@ if st.session_state["initialized"]:
                     )
                 elif operation == "upload_to_signed_url":
                     response = st_supabase.upload_to_signed_url(
-                        bucket_id, source, path, token, file
+                        bucket_id,
+                        source,
+                        path,
+                        token,
+                        file,
+                        overwrite,
                     )
                 else:
                     response = eval(constructed_storage_query)

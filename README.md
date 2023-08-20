@@ -87,7 +87,8 @@ A Streamlit connection component to connect Streamlit to Supabase Storage and Da
   bucket_id = st.text_input("Enter the bucket_id")
   uploaded_file = st.file_uploader("Choose a file")
   destination_path = st.text_input("Enter destination path")
-
+  overwrite = "true" if st.checkbox("Overwrite if exists?") else "false"  
+  
   with open(uploaded_file.name, "wb") as f:
       f.write(uploaded_file.getbuffer())
 
@@ -96,7 +97,10 @@ A Streamlit connection component to connect Streamlit to Supabase Storage and Da
           supabase_client.storage.from_(bucket_id).upload(
               path=destination_path,
               file=f,
-              file_options={"content-type": uploaded_file.type},
+              file_options={
+                "content-type": uploaded_file.type,
+                "x-upsert": overwrite,
+                },
           )
 
   ``` 
@@ -115,9 +119,12 @@ A Streamlit connection component to connect Streamlit to Supabase Storage and Da
   bucket_id = st.text_input("Enter the bucket_id")
   uploaded_file = st.file_uploader("Choose a file"):
   destination_path = st.text_input("Enter destination path")
+  overwrite = "true" if st.checkbox("Overwrite if exists?") else "false" 
 
   if st.button("Upload"):
-      st_supabase_client.upload(bucket_id, "local", uploaded_file, destination_path)
+      st_supabase_client.upload(
+        bucket_id, "local", uploaded_file, destination_path, overwrite,
+        )
   ```
   <tr>
   </table>

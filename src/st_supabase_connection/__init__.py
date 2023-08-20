@@ -11,7 +11,7 @@ from streamlit import cache_data, cache_resource
 from streamlit.connections import ExperimentalBaseConnection
 from supabase import Client, create_client
 
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 
 
 class SupabaseConnection(ExperimentalBaseConnection[Client]):
@@ -167,13 +167,13 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
         )
         return response.json()
 
-    # TODO: Support overwriting existing files
     def upload(
         self,
         bucket_id: str,
         source: Literal["local", "hosted"],
         file: Union[str, Path, BytesIO],
         destination_path: str,
+        overwrite: Literal["true", "false"] = "false",
     ) -> dict[str, str]:
         """Uploads a file to a Supabase bucket.
 
@@ -189,7 +189,9 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
             or the `BytesIO` object returned by `st.file_uploader()` if `source="local"`.
         destination_path : str
             Path is the bucket where the file will be uploaded to.
-            Folders will be created as needed. Defaults to `/filename.fileext`
+            Folders will be created as needed. Defaults to `/filename.fileext`.
+        overwrite : str
+            Whether to overwrite existing file. Defaults to `false`.
         """
 
         if source == "local":
@@ -199,14 +201,17 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
                 response = self.client.storage.from_(bucket_id).upload(
                     path=destination_path or f"/{file.name}",
                     file=f,
-                    file_options={"content-type": file.type},
+                    file_options={"content-type": file.type, "x-upsert": overwrite},
                 )
         elif source == "hosted":
             with open(file, "rb") as f:
                 response = self.client.storage.from_(bucket_id).upload(
                     path=destination_path or f"/{os.path.basename(f.name)}",
                     file=f,
-                    file_options={"content-type": mimetypes.guess_type(file)[0]},
+                    file_options={
+                        "content-type": mimetypes.guess_type(file)[0],
+                        "x-upsert": overwrite,
+                    },
                 )
         return response.json()
 
@@ -446,7 +451,6 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
             "path": path,
         }
 
-    # TODO: Support overwriting existing files
     def upload_to_signed_url(
         self,
         bucket_id: str,
