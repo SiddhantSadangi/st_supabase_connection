@@ -104,7 +104,9 @@ with st.sidebar:
 # ---------- MAIN PAGE ----------
 st.header("🔌Supabase Connection for Streamlit")
 
-st.write("📖 Demo and tutorial for `st_supabase_connection` for Supabase Storage and Database.")
+st.write(
+    "🧑‍🎓 Demo and tutorial for [st_supabase_connection](https://github.com/SiddhantSadangi/st_supabase_connection)."
+)
 
 st.subheader("🏗️ Initialize Connection")
 
