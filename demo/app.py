@@ -102,9 +102,11 @@ with st.sidebar:
     st.components.v1.html(sidebar_html, height=600)
 
 # ---------- MAIN PAGE ----------
-st.header("🔌Supabase Connection for Streamlit")
+st.header("🔌Supabase Connection for Streamlit", divider="violet")
 
-st.write("📖 Demo and tutorial for `st_supabase_connection` for Supabase Storage and Database.")
+st.write(
+    "🧑‍🎓 Demo and tutorial for [st_supabase_connection](https://github.com/SiddhantSadangi/st_supabase_connection)."
+)
 
 st.subheader("🏗️ Initialize Connection")
 

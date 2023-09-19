@@ -13,123 +13,134 @@ A Streamlit connection component to connect Streamlit to Supabase Storage and Da
 - [X] **Exposes more storage methods** than currently supported by the Supabase Python API. For example, `update()`, `create_signed_upload_url()`, and `upload_to_signed_url()`
 - [X] **Less keystrokes required** when integrating with your Streamlit app.
 
-  <details close>
-  <summary>Examples with and without the connector </summary>
-  <br>
-  <table>
-  <tr>
-  <td><b>Without connector</b></td><td><b>With connector</b></td>
-  <tr>
-    <td colspan="2"> Download file to local system from Supabase storage </td>
-  <tr>
-  <td valign="top">
+<details close>
+<summary>Examples with and without the connector </summary>
+<br>
+<table>
+<tr>
+<td><b>Without connector</b></td><td><b>With connector</b></td>
+<tr>
+<td colspan="2"> Download file to local system from Supabase storage </td>
+<tr>
+<td valign="top">
 
-  ```python
-  import mimetypes
-  import streamlit as st
-  from supabase import create_client
+```python
+import mimetypes
+import streamlit as st
+from supabase import create_client
 
-  supabase_client = create_client(
-      supabase_url="...", supabase_key="..."
-  )
+supabase_client = create_client(
+    supabase_url="...", supabase_key="..."
+)
 
-  bucket_id = st.text_input("Enter the bucket_id")
-  source_path = st.text_input("Enter source path")
+bucket_id = st.text_input("Enter the bucket_id")
+source_path = st.text_input("Enter source path")
 
-  file_name = source_path.split("/")[-1]
+file_name = source_path.split("/")[-1]
 
-  if st.button("Request download"):
-      with open(file_name, "wb+") as f:
-          response = supabase_client.storage.from_(bucket_id).download(source_path)
-          f.write(response)
+if st.button("Request download"):
+    with open(file_name, "wb+") as f:
+        response = supabase_client.storage.from_(
+        bucket_id
+        ).download(source_path)
+        f.write(response)
 
-      mime = mimetypes.guess_type(file_name)[0]
-      data = open(file_name, "rb")
+    mime = mimetypes.guess_type(file_name)[0]
+    data = open(file_name, "rb")
 
-      st.download_button("Download file", data=data, file_name=file_name, mime=mime)
-  ```
+    st.download_button(
+        "Download file", data=data, 
+        file_name=file_name, mime=mime,
+    )
+```
 
-  </td>
-  <td valign="top">
+</td>
+<td valign="top">
 
-  ```python
-  import streamlit as st
-  from st_supabase_connection import SupabaseConnection
+```python
+import streamlit as st
+from st_supabase_connection import SupabaseConnection
 
-  st_supabase_client = st.experimental_connection(
-      name="supabase_connection", type=SupabaseConnection
-  )
+st_supabase_client = st.experimental_connection(
+    name="supabase_connection", type=SupabaseConnection
+)
 
-  bucket_id = st.text_input("Enter the bucket_id")
-  source_path = st.text_input("Enter source path")
+bucket_id = st.text_input("Enter the bucket_id")
+source_path = st.text_input("Enter source path")
 
-  if st.button("Request download"):
-      file_name, mime, data = st_supabase_client.download(bucket_id, source_path)
+if st.button("Request download"):
+    file_name, mime, data = st_supabase_client.download(
+        bucket_id, source_path,
+    )
 
-      st.download_button("Download file", data=data, file_name=file_name, mime=mime)
+    st.download_button(
+        "Download file", data=data, 
+        file_name=file_name, mime=mime,
+    )
 
-  ```
+```
 
-  </td>
-  <tr>
-  <td colspan="2"> Upload file from local system to Supabase storage </td>
-  <tr>
-  <td valign="top">
+</td>
+<tr>
+<td colspan="2"> Upload file from local system to Supabase storage </td>
+<tr>
+<td valign="top">
 
-  ```python
-  import streamlit as st
-  from supabase import create_client
+```python
+import streamlit as st
+from supabase import create_client
 
-  supabase_client = create_client(
-    supabase_key="...", supabase_url="..."
-  )
+supabase_client = create_client(
+supabase_key="...", supabase_url="..."
+)
 
-  bucket_id = st.text_input("Enter the bucket_id")
-  uploaded_file = st.file_uploader("Choose a file")
-  destination_path = st.text_input("Enter destination path")
-  overwrite = "true" if st.checkbox("Overwrite if exists?") else "false"  
-  
-  with open(uploaded_file.name, "wb") as f:
-      f.write(uploaded_file.getbuffer())
+bucket_id = st.text_input("Enter the bucket_id")
+uploaded_file = st.file_uploader("Choose a file")
+destination_path = st.text_input("Enter destination path")
+overwrite = "true" if st.checkbox("Overwrite?") else "false"  
 
-  if st.button("Upload"):
-      with open(uploaded_file.name, "rb") as f:
-          supabase_client.storage.from_(bucket_id).upload(
-              path=destination_path,
-              file=f,
-              file_options={
-                "content-type": uploaded_file.type,
-                "x-upsert": overwrite,
-                },
-          )
+with open(uploaded_file.name, "wb") as f:
+    f.write(uploaded_file.getbuffer())
 
-  ``` 
-
-  </td>
-  <td valign="top">
-
-  ```python
-  import streamlit as st
-  from st_supabase_connection import SupabaseConnection
-
-  st_supabase_client = st.experimental_connection(
-      name="supabase_connection", type=SupabaseConnection
-  )
-
-  bucket_id = st.text_input("Enter the bucket_id")
-  uploaded_file = st.file_uploader("Choose a file"):
-  destination_path = st.text_input("Enter destination path")
-  overwrite = "true" if st.checkbox("Overwrite if exists?") else "false" 
-
-  if st.button("Upload"):
-      st_supabase_client.upload(
-        bucket_id, "local", uploaded_file, destination_path, overwrite,
+if st.button("Upload"):
+    with open(uploaded_file.name, "rb") as f:
+        supabase_client.storage.from_(bucket_id).upload(
+            path=destination_path,
+            file=f,
+            file_options={
+            "content-type": uploaded_file.type,
+            "x-upsert": overwrite,
+            },
         )
-  ```
-  <tr>
-  </table>
 
-  </details>
+``` 
+
+</td>
+<td valign="top">
+
+```python
+import streamlit as st
+from st_supabase_connection import SupabaseConnection
+
+st_supabase_client = st.experimental_connection(
+    name="supabase_connection", type=SupabaseConnection
+)
+
+bucket_id = st.text_input("Enter the bucket_id")
+uploaded_file = st.file_uploader("Choose a file"):
+destination_path = st.text_input("Enter destination path")
+overwrite = "true" if st.checkbox("Overwrite?") else "false" 
+
+if st.button("Upload"):
+    st_supabase_client.upload(
+        bucket_id, "local", uploaded_file, 
+        destination_path, overwrite,
+    )
+```
+<tr>
+</table>
+
+</details>
 
 ## :hammer_and_wrench: Setup
 
@@ -140,7 +151,7 @@ pip install st-supabase-connection
 2. Set the `SUPABASE_URL` and `SUPABASE_KEY` Streamlit secrets as described [here](https://docs.streamlit.io/streamlit-community-cloud/get-started/deploy-an-app/connect-to-data-sources/secrets-management).
 
 > [!NOTE]  
-> For local development outside Streamlit, you can also set these as your environment variables (recommended), or pass these to the `url` and `key` args of `st.experimental_connection()` (not recommended).
+> For local development outside Streamlit, you can also set these as your environment variables (recommended), or pass these to the `url` and `key` args of `st.experimental_connection()`.
 
 ## :magic_wand: Usage
 

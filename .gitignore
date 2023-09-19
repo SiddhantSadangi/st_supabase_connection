@@ -106,4 +106,4 @@ cookiecutter-pypackage-env/
 .direnv/
 
 # streamlit
-.streamlit/secrets.toml
+/.streamlit/secrets.toml
