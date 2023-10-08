@@ -2,7 +2,6 @@ import contextlib
 
 import pandas as pd
 import streamlit as st
-from gotrue.errors import AuthApiError
 
 from st_supabase_connection import SupabaseConnection, __version__
 
@@ -1050,7 +1049,8 @@ st_supabase.auth.verify_otp(dict(type="magiclink", email=email, token=token))
                     with st.expander("JSON response"):
                         st.write(response.dict())
 
-            except AuthApiError as e:
-                st.error("No logged-in user. Log in or sign up first.", icon="❌")
             except Exception as e:
-                st.error(e, icon="❌")
+                if auth_operation == "get_user":
+                    st.error("No logged-in user session. Log in or sign up first.", icon="❌")
+                else:
+                    st.error(e, icon="❌")
