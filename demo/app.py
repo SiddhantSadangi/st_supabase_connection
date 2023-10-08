@@ -1051,6 +1051,6 @@ st_supabase.auth.verify_otp(dict(type="magiclink", email=email, token=token))
 
             except Exception as e:
                 if auth_operation == "get_user":
-                    st.error("No logged-in user session. Log in or sign up first.", icon="❌")
+                    st.error("No logged-in user. Log in or sign up first.", icon="❌")
                 else:
                     st.error(e, icon="❌")
