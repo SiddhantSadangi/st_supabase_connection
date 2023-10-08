@@ -2,6 +2,7 @@ import contextlib
 
 import pandas as pd
 import streamlit as st
+from gotrue.errors import AuthApiError
 
 from st_supabase_connection import SupabaseConnection, __version__
 
@@ -21,45 +22,6 @@ st.set_page_config(
 # ---------- INIT SESSION ----------
 upsert = operators = bucket_id = file_size_limit = allowed_mime_types = source = None
 public = False
-
-STORAGE_OPERATIONS = [
-    "Create a bucket",
-    "Update bucket",
-    "Delete a bucket",
-    "Empty a bucket",
-    "Upload a file",
-    "Move an existing file",
-    "Delete files in a bucket",
-    "Create a signed upload URL",
-    "Upload to signed URL",
-    "Retrieve a bucket",
-    "List all buckets",
-    "Download a file",
-    "List all files in a bucket",
-    "Create signed URLs",
-    "Retrieve public URL",
-]
-
-RESTRICTED_STORAGE_OPERATORS = [
-    "create_bucket",
-    "update_bucket",
-    "delete_bucket",
-    "empty_bucket",
-    "upload",
-    "move",
-    "remove",
-    "create_signed_upload_url",
-    "upload_to_signed_url",
-]
-
-STORAGE_OPERATORS = RESTRICTED_STORAGE_OPERATORS + [
-    "get_bucket",
-    "list_buckets",
-    "download",
-    "list_objects",
-    "create_signed_urls",
-    "get_public_url",
-]
 
 if "client" not in st.session_state:
     st.session_state["client"] = None
@@ -84,9 +46,9 @@ with st.sidebar:
         st.info(
             """
                 1. Select a project and initialize client
-                2. Select the relevant DB or Storage operation and options
+                2. Select the relevant operation and options
                 3. Run the query to get the results 
-                4. Copy the constructed statement to use in your own app.
+                4. Copy the constructed code to use in your own app.
                 """
         )
 
@@ -205,10 +167,51 @@ if st.session_state["initialized"]:
     st.success("Client initialized!", icon="✅")
 
 if st.session_state["initialized"]:
-    storage, database = st.tabs(["Explore storage 🔍📦", "Explore database 🔍🗄️"])
+    storage, database, auth = st.tabs(
+        ["Explore storage 📦", "Explore database 🗄️", "Explore auth 🔐"]
+    )
 
     with storage:
         st.subheader("📦 Run Storage Queries")
+
+        STORAGE_OPERATIONS = [
+            "Create a bucket",
+            "Update bucket",
+            "Delete a bucket",
+            "Empty a bucket",
+            "Upload a file",
+            "Move an existing file",
+            "Delete files in a bucket",
+            "Create a signed upload URL",
+            "Upload to signed URL",
+            "Retrieve a bucket",
+            "List all buckets",
+            "Download a file",
+            "List all files in a bucket",
+            "Create signed URLs",
+            "Retrieve public URL",
+        ]
+
+        RESTRICTED_STORAGE_OPERATORS = [
+            "create_bucket",
+            "update_bucket",
+            "delete_bucket",
+            "empty_bucket",
+            "upload",
+            "move",
+            "remove",
+            "create_signed_upload_url",
+            "upload_to_signed_url",
+        ]
+
+        STORAGE_OPERATORS = RESTRICTED_STORAGE_OPERATORS + [
+            "get_bucket",
+            "list_buckets",
+            "download",
+            "list_objects",
+            "create_signed_urls",
+            "get_public_url",
+        ]
 
         if st.session_state["project"] == "custom":
             st.warning(
@@ -217,7 +220,7 @@ if st.session_state["initialized"]:
             )
         elif st.session_state["project"] == "demo":
             st.info(
-                "You are using the demo project. Some functionality won't be available.",
+                "You are using the demo project. Some features won't be available.",
                 icon="ℹ️",
             )
             st.write("Demo storage schema")
@@ -560,7 +563,7 @@ if st.session_state["initialized"]:
                 """
             st.session_state["storage_disabled"] = False if all([bucket_id, token, path]) else True
 
-        st.write("**Constructed statement**")
+        st.write("**Constructed code**")
         if operation == "download":
             st.code(
                 f"file_name, mime, data = {constructed_storage_query}",
@@ -722,7 +725,7 @@ if st.session_state["initialized"]:
             )
         elif st.session_state["project"] == "demo":
             st.info(
-                "You are using the demo project. Some functionality won't be available.",
+                "You are using the demo project. Some features won't be available.",
                 icon="ℹ️",
             )
             st.write("Demo database schema")
@@ -859,7 +862,7 @@ if st.session_state["initialized"]:
                 )
             else:
                 constructed_db_query = f"""st_supabase.table("{table}").{request_builder}({request_builder_query}).execute()"""
-        st.write("**Constructed statement**")
+        st.write("**Constructed code**")
         st.code(constructed_db_query)
 
         lcol, rcol = st.columns([2, 1])
@@ -908,3 +911,146 @@ if st.session_state["initialized"]:
                         e,
                         icon="❌",
                     )
+
+    with auth:
+        st.subheader("🔐 Run Auth Queries")
+
+        AUTH_OPERATIONS = [
+            "Create a new user",
+            "Sign in with password",
+            "Sign in with OTP",
+            "Retrieve session",
+            "Retrieve user",
+            "Sign out",
+        ]
+
+        AUTH_OPERATORS = [
+            "sign_up",
+            "sign_in_with_password",
+            "sign_in_with_otp",
+            "get_session",
+            "get_user",
+            "sign_out",
+        ]
+
+        selected_auth_operation = st.selectbox(
+            label="Select operation",
+            options=AUTH_OPERATIONS,
+            help="[Supabase Auth API reference](https://supabase.com/docs/reference/python/auth-signup)",
+        )
+
+        auth_operation_query_dict = dict(zip(AUTH_OPERATIONS, AUTH_OPERATORS))
+        auth_operation = auth_operation_query_dict.get(selected_auth_operation)
+
+        if auth_operation == "sign_up":
+            lcol, rcol = st.columns(2)
+            email = lcol.text_input(label="Enter your email ID")
+            password = rcol.text_input(
+                label="Enter your password",
+                placeholder="Min 6 characters",
+                type="password",
+                help="Password is encrypted",
+            )
+
+            fname = lcol.text_input(
+                label="First name",
+                placeholder="Optional",
+            )
+
+            attribution = rcol.text_area(
+                label="How did you hear about us?",
+                placeholder="Optional",
+            )
+
+            constructed_auth_query = f"st_supabase.auth.{auth_operation}(dict({email=}, {password=}, options=dict(data=dict({fname=},{attribution=}))))"
+
+        elif auth_operation == "sign_in_with_password":
+            lcol, rcol = st.columns(2)
+            email = lcol.text_input(label="Enter your email ID")
+            password = rcol.text_input(
+                label="Enter your password",
+                placeholder="Min 6 characters",
+                type="password",
+                help="Password is encrypted",
+            )
+
+            constructed_auth_query = (
+                f"st_supabase.auth.{auth_operation}(dict({email=}, {password=}))"
+            )
+
+        elif auth_operation == "sign_in_with_otp":
+            st.info(
+                """Interactive demo not available for `sign_in_with_otp()` due to technical constraints.  
+                
+Follow the below steps to implement in your app:  
+1. Setup your Email Templates in your Supabase project: https://supabase.com/dashboard/project/project-id/auth/templates  
+(replace "project-id" with your Supabase project ID)  
+2. Get user's email ID:  
+```
+email = st.text_input(label="Enter your email ID")
+```
+3. Send OTP to email ID: ([`sign_in_with_otp()` documentation](https://supabase.com/docs/reference/python/auth-signinwithotp))  
+
+```
+st_supabase.auth.sign_in_with_otp(dict(email=email))
+```
+4. Enter OTP:  
+```
+token = st.text_input("Enter OTP", type="password")
+```
+5. Verify OTP and login: ([verity_otp() documentation](https://supabase.com/docs/reference/python/auth-verifyotp))  
+```
+st_supabase.auth.verify_otp(dict(type="magiclink", email=email, token=token))
+```
+                """
+            )
+            constructed_auth_query = None
+        elif auth_operation in ["get_session", "get_user", "sign_out"]:
+            constructed_auth_query = f"st_supabase.auth.{auth_operation}()"
+
+        if constructed_auth_query:
+            st.write("**Constructed code**")
+            st.code(constructed_auth_query)
+
+        if st.button(
+            "Execute 🪄",
+            use_container_width=True,
+            type="primary",
+            key="run_auth_query",
+            disabled=not constructed_auth_query,
+        ):
+            try:
+                response = eval(constructed_auth_query)
+
+                if auth_operation == "sign_up":
+                    auth_success_message = f"User created. Welcome {fname or ''} 🚀"
+                elif auth_operation in "sign_in_with_password":
+                    auth_success_message = f"""Logged in. Welcome {response.dict()["user"]["user_metadata"]["fname"] or ''}  🔓"""
+                elif auth_operation == "sign_out":
+                    auth_success_message = "Signed out 🔒"
+                elif auth_operation == "get_user":
+                    auth_success_message = f"""{response.dict()["user"]["email"]} is logged in"""
+                elif auth_operation == "get_session":
+                    if response:
+                        auth_success_message = (
+                            (f"""{response.dict()["user"]["email"]} is logged in""")
+                            if response
+                            else None
+                        )
+                    else:
+                        raise Exception("No logged-in user session. Log in or sign up first.")
+
+                elif auth_operation == "sign_out":
+                    auth_success_message = None
+
+                if auth_success_message:
+                    st.success(auth_success_message)
+
+                if response != None:
+                    with st.expander("JSON response"):
+                        st.write(response.dict())
+
+            except AuthApiError as e:
+                st.error("No logged-in user. Log in or sign up first.", icon="❌")
+            except Exception as e:
+                st.error(e, icon="❌")

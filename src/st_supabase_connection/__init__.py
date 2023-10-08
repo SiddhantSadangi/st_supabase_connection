@@ -11,7 +11,7 @@ from streamlit import cache_data, cache_resource
 from streamlit.connections import ExperimentalBaseConnection
 from supabase import Client, create_client
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 
 class SupabaseConnection(ExperimentalBaseConnection[Client]):
@@ -62,6 +62,7 @@ class SupabaseConnection(ExperimentalBaseConnection[Client]):
 
         self.client = create_client(url, key)
         self.table = self.client.table
+        self.auth = self.client.auth
         self.delete_bucket = self.client.storage.delete_bucket
         self.empty_bucket = self.client.storage.empty_bucket
 
