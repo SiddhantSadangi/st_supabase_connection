@@ -1,7 +1,7 @@
 # :electric_plug: Streamlit Supabase Connector
 [![Downloads](https://static.pepy.tech/personalized-badge/st-supabase-connection?period=total&units=international_system&left_color=black&right_color=brightgreen&left_text=Downloads)](https://pepy.tech/project/st-supabase-connection)
 
-A Streamlit connection component to connect Streamlit to Supabase Storage and Database.
+A Streamlit connection component to connect Streamlit to Supabase Storage, Database, and Auth.
 
 ## :student: Interactive tutorial
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-supabase-connection.streamlit.app/)
@@ -151,7 +151,7 @@ pip install st-supabase-connection
 2. Set the `SUPABASE_URL` and `SUPABASE_KEY` Streamlit secrets as described [here](https://docs.streamlit.io/streamlit-community-cloud/get-started/deploy-an-app/connect-to-data-sources/secrets-management).
 
 > [!NOTE]  
-> For local development outside Streamlit, you can also set these as your environment variables (recommended), or pass these to the `url` and `key` args of `st.experimental_connection()` (not recommended).
+> For local development outside Streamlit, you can also set these as your environment variables (recommended), or pass these to the `url` and `key` args of `st.experimental_connection()`.
 
 ## :magic_wand: Usage
 
@@ -175,20 +175,20 @@ pip install st-supabase-connection
 <details close>
 <summary> Storage </summary>
 <ul>
-    <li> delete_bucket() </li>
-    <li> empty_bucket() </li>
-    <li> get_bucket() </li>
-    <li> list_buckets() </li>
-    <li> create_bucket() </li>
-    <li> upload() </li>
-    <li> download() </li>
-    <li> update_bucket() </li>
-    <li> move() </li>
-    <li> list_objects() </li>
-    <li> create_signed_urls() </li>
-    <li> get_public_url() </li>
-    <li> create_signed_upload_url() </li>
-    <li> upload_to_signed_url() </li>
+    <li> <code>delete_bucket()</code> </li>
+    <li> <code>empty_bucket()</code> </li>
+    <li> <code>get_bucket()</code> </li>
+    <li> <code>list_buckets()</code> </li>
+    <li> <code>create_bucket()</code> </li>
+    <li> <code>upload()</code> </li>
+    <li> <code>download()</code> </li>
+    <li> <code>update_bucket()</code> </li>
+    <li> <code>move()</code> </li>
+    <li> <code>list_objects()</code> </li>
+    <li> <code>create_signed_urls()</code> </li>
+    <li> <code>get_public_url()</code> </li>
+    <li> <code>create_signed_upload_url()</code> </li>
+    <li> <code>upload_to_signed_url()</code> </li>
 </ul> 
 
 </details>
@@ -196,10 +196,15 @@ pip install st-supabase-connection
 <details close>
 <summary> Database </summary>
 <ul>
-    <li> query() - Runs a cached SELECT query </li>
+    <li> <code>query()</code> - Runs a cached SELECT query </li>
     <li> All methods supported by <a href="https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html">postgrest-py</a>.
 </details>
 
+<details>
+<summary> Auth </summary>
+<ul>
+    All methods supported by <a href="https://supabase.com/docs/reference/python/auth-signup">Supabase's Python API </a>.
+</details>
 
 ## :books: Examples
 ### :package: Storage operations
@@ -367,6 +372,139 @@ APIResponse(
     count=None,
 )
 ```
+
+###  :lock: Auth operations
+
+> [!NOTE]  
+> If the call is valid, all Supabase Auth methods return the same response structure:
+> ```json
+> {
+>   "user": {
+>     "id": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544",
+>     "app_metadata": {
+>       "provider": "email",
+>       "providers": [
+>         "email"
+>       ]
+>     },
+>     "user_metadata": {
+>       "attribution": "I made it :)",
+>       "fname": "Siddhant"
+>     },
+>     "aud": "authenticated",
+>     "confirmation_sent_at": null,
+>     "recovery_sent_at": null,
+>     "email_change_sent_at": null,
+>     "new_email": null,
+>     "invited_at": null,
+>     "action_link": null,
+>     "email": "test.user@abc.com",
+>     "phone": "",
+>     "created_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 365359, tzinfo=datetime.timezone.utc)",
+>     "confirmed_at": null,
+>     "email_confirmed_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 373966, tzinfo=datetime.timezone.utc)",
+>     "phone_confirmed_at": null,
+>     "last_sign_in_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 377070, tzinfo=datetime.timezone.utc)",
+>     "role": "authenticated",
+>     "updated_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 381584, tzinfo=datetime.timezone.utc)",
+>     "identities": [
+>       {
+>         "id": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544",
+>         "user_id": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544",
+>         "identity_data": {
+>           "email": "siddhant.sadangi@gmail.com",
+>           "sub": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544"
+>         },
+>         "provider": "email",
+>         "created_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 370040, tzinfo=datetime.timezone.utc)",
+>         "last_sign_in_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 370002, tzinfo=datetime.timezone.utc)",
+>         "updated_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 370040, tzinfo=datetime.timezone.utc)"
+>       }
+>     ],
+>     "factors": null
+>   },
+>   "session": {
+>     "provider_token": null,
+>     "provider_refresh_token": null,
+>     "access_token": "***",
+>     "refresh_token": "***",
+>     "expires_in": 3600,
+>     "expires_at": 1696800390,
+>     "token_type": "bearer",
+>     "user": {
+>       "id": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544",
+>       "app_metadata": {
+>         "provider": "email",
+>         "providers": [
+>           "email"
+>         ]
+>       },
+>       "user_metadata": {
+>         "attribution": "I made it :)",
+>         "fname": "Siddhant"
+>       },
+>       "aud": "authenticated",
+>       "confirmation_sent_at": null,
+>       "recovery_sent_at": null,
+>       "email_change_sent_at": null,
+>       "new_email": null,
+>       "invited_at": null,
+>       "action_link": null,
+>       "email": "test.user@abc.com",
+>       "phone": "",
+>       "created_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 365359, tzinfo=datetime.timezone.utc)",
+>       "confirmed_at": null,
+>       "email_confirmed_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 373966, tzinfo=datetime.timezone.utc)",
+>       "phone_confirmed_at": null,
+>       "last_sign_in_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 377070, tzinfo=datetime.timezone.utc)",
+>       "role": "authenticated",
+>       "updated_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 381584, tzinfo=datetime.timezone.utc)",
+>       "identities": [
+>         {
+>           "id": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544",
+>           "user_id": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544",
+>           "identity_data": {
+>             "email": "siddhant.sadangi@gmail.com",
+>             "sub": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544"
+>           },
+>           "provider": "email",
+>           "created_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 370040, tzinfo=datetime.timezone.utc)",
+>           "last_sign_in_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 370002, tzinfo=datetime.timezone.utc)",
+>           "updated_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 370040, tzinfo=datetime.timezone.utc)"
+>         }
+>       ],
+>       "factors": null
+>     }
+>   }
+> }
+> ```
+> </details>
+
+#### Create new user
+```python
+>>> st_supabase_client.auth.sign_up(dict(email='test.user@abc.com', password='***', options=dict(data=dict(fname='Siddhant',attribution='I made it :)'))))
+```
+
+#### Sign in with password
+```python
+>>> st_supabase_client.auth.sign_in_with_password(dict(email='test.user@abc.com', password='***'))
+```
+
+#### Retrieve session
+```python
+>>> st_supabase.auth.get_session()
+```
+
+#### Retrieve user
+```python
+>>> st_supabase.auth.get_user()
+```
+
+#### Sign out
+```python
+>>> st_supabase.auth.sign_out()
+```
+
 > [!NOTE]  
 > Check the [Supabase Python API reference](https://supabase.com/docs/reference/python/select) for more examples.
 
