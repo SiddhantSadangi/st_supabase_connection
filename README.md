@@ -211,7 +211,7 @@ pip install st-supabase-connection
 
 #### List existing buckets
 ```python
->>> st_supabase.list_buckets(ttl=None)
+>>> st_supabase_client.list_buckets(ttl=None)
 [
     SyncBucket(
         id="bucket1",
@@ -243,7 +243,7 @@ pip install st-supabase-connection
 
 #### Get bucket details
 ```python
->>> st_supabase.get_bucket("new_bucket")
+>>> st_supabase_client.get_bucket("new_bucket")
 SyncBucket(id='new_bucket', name='new_bucket', owner='', public=True, created_at=datetime.datetime(2023, 8, 2, 19, 41, 44, 810000, tzinfo=tzutc()), updated_at=datetime.datetime(2023, 8, 2, 19, 41, 44, 810000, tzinfo=tzutc()), file_size_limit=None, allowed_mime_types=None)
 ```
 #### Update a bucket
@@ -288,7 +288,7 @@ SyncBucket(id='new_bucket', name='new_bucket', owner='', public=True, created_at
 
 #### Empty a bucket
 ```python
->>> st_supabase.empty_bucket("new_bucket")
+>>> st_supabase_client.empty_bucket("new_bucket")
 {'message': 'Successfully emptied'}
 ```
 #### Delete a bucket
@@ -299,7 +299,7 @@ SyncBucket(id='new_bucket', name='new_bucket', owner='', public=True, created_at
 ### :file_cabinet: Database operations
 #### Simple query 
 ```python
->>> st_supabase.query("*", table="countries", ttl=0).execute()
+>>> st_supabase_client.query("*", table="countries", ttl=0).execute()
 APIResponse(
     data=[
         {"id": 1, "name": "Afghanistan"},
@@ -311,7 +311,7 @@ APIResponse(
 ```
 #### Query with join
 ```python
->>> st_supabase.query("name, teams(name)", table="users",  count="exact", ttl="1h").execute()
+>>> st_supabase_client.query("name, teams(name)", table="users",  count="exact", ttl="1h").execute()
 APIResponse(
     data=[
         {"name": "Kiran", "teams": [{"name": "Green"}, {"name": "Blue"}]},
@@ -322,7 +322,7 @@ APIResponse(
 ```
 #### Filter through foreign tables
 ```python
->>> st_supabase.query("name, countries(*)", count="exact", table="cities", ttl=None).eq(
+>>> st_supabase_client.query("name, countries(*)", count="exact", table="cities", ttl=None).eq(
         "countries.name", "Curaçao"
     ).execute()
 
