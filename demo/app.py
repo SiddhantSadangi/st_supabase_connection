@@ -89,7 +89,7 @@ with st.expander("**Select project**", expanded=not st.session_state["initialize
             use_container_width=True,
         ):
             try:
-                st.session_state["client"] = st.experimental_connection(
+                st.session_state["client"] = st.connection(
                     name="supabase_connection", type=SupabaseConnection, ttl=ttl
                 )
                 st.session_state["initialized"] = True
@@ -105,7 +105,7 @@ with st.expander("**Select project**", expanded=not st.session_state["initialize
             st.write("A connection is initialized as")
             st.code(
                 f"""
-                st_supabase = st.experimental_connection(
+                st_supabase = st.connection(
                     name="supabase_connection", type=SupabaseConnection, {ttl=}
                     )
                 """,
@@ -131,7 +131,7 @@ with st.expander("**Select project**", expanded=not st.session_state["initialize
                 use_container_width=True,
             ):
                 try:
-                    st.session_state["client"] = st.experimental_connection(
+                    st.session_state["client"] = st.connection(
                         name="supabase_connection",
                         type=SupabaseConnection,
                         ttl=ttl,
@@ -151,7 +151,7 @@ with st.expander("**Select project**", expanded=not st.session_state["initialize
                 st.write("A connection is initialized as")
                 st.code(
                     f"""
-                    st_supabase = st.experimental_connection(
+                    st_supabase = st.connection(
                         name="supabase_connection", 
                         type=SupabaseConnection, 
                         {ttl=},

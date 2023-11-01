@@ -47,5 +47,5 @@ setuptools.setup(
     ],
     keywords=["streamlit", "supabase", "connection", "integration"],
     python_requires=">=3.8",
-    install_requires=["streamlit", "supabase"],
+    install_requires=["streamlit>=1.28", "supabase"],
 )

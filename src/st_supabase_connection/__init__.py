@@ -8,13 +8,13 @@ from typing import Literal, Optional, Tuple, Union, types
 
 from postgrest import SyncSelectRequestBuilder, types
 from streamlit import cache_data, cache_resource
-from streamlit.connections import ExperimentalBaseConnection
+from streamlit.connections import BaseConnection
 from supabase import Client, create_client
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 
 
-class SupabaseConnection(ExperimentalBaseConnection[Client]):
+class SupabaseConnection(BaseConnection[Client]):
     """
     Connects a streamlit app to Supabase Storage and Database
 

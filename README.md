@@ -61,7 +61,7 @@ if st.button("Request download"):
 import streamlit as st
 from st_supabase_connection import SupabaseConnection
 
-st_supabase_client = st.experimental_connection(
+st_supabase_client = st.connection(
     name="supabase_connection", type=SupabaseConnection
 )
 
@@ -122,7 +122,7 @@ if st.button("Upload"):
 import streamlit as st
 from st_supabase_connection import SupabaseConnection
 
-st_supabase_client = st.experimental_connection(
+st_supabase_client = st.connection(
     name="supabase_connection", type=SupabaseConnection
 )
 
@@ -151,7 +151,7 @@ pip install st-supabase-connection
 2. Set the `SUPABASE_URL` and `SUPABASE_KEY` Streamlit secrets as described [here](https://docs.streamlit.io/streamlit-community-cloud/get-started/deploy-an-app/connect-to-data-sources/secrets-management).
 
 > [!NOTE]  
-> For local development outside Streamlit, you can also set these as your environment variables (recommended), or pass these to the `url` and `key` args of `st.experimental_connection()`.
+> For local development outside Streamlit, you can also set these as your environment variables (recommended), or pass these to the `url` and `key` args of `st.connection()`.
 
 ## :magic_wand: Usage
 
@@ -161,7 +161,7 @@ pip install st-supabase-connection
   ```
 2. Initialize
   ```python
-  st_supabase_client = st.experimental_connection(
+  st_supabase_client = st.connection(
       name="YOUR_CONNECTION_NAME",
       type=SupabaseConnection,
       ttl=None,
