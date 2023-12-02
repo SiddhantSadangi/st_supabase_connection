@@ -5,6 +5,7 @@ A Streamlit connection component to connect Streamlit to Supabase Storage, Datab
 
 ## :student: Interactive tutorial
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-supabase-connection.streamlit.app/)
+![Web capture_2-12-2023_124639_st-supabase-connection streamlit app](https://github.com/SiddhantSadangi/st_supabase_connection/assets/41324509/2870b021-48a0-4143-9693-c840880a28be)
 
 
 ## :thinking: Why use this?
