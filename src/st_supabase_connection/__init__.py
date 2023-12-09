@@ -11,7 +11,7 @@ from streamlit import cache_data, cache_resource
 from streamlit.connections import BaseConnection
 from supabase import Client, create_client
 
-__version__ = "1.2.1"
+__version__ = "1.2.2"
 
 
 class SupabaseConnection(BaseConnection[Client]):
@@ -138,8 +138,8 @@ class SupabaseConnection(BaseConnection[Client]):
         name: Optional[str] = None,
         public: Optional[bool] = False,
         file_size_limit: Optional[int] = None,
-        allowed_mime_types: Optional[list[str]] = None,
-    ) -> dict[str, str]:
+        allowed_mime_types: Optional["list[str]"] = None,
+    ) -> "dict[str, str]":
         """Creates a new storage bucket.
 
         Parameters
@@ -175,7 +175,7 @@ class SupabaseConnection(BaseConnection[Client]):
         file: Union[str, Path, BytesIO],
         destination_path: str,
         overwrite: Literal["true", "false"] = "false",
-    ) -> dict[str, str]:
+    ) -> "dict[str, str]":
         """Uploads a file to a Supabase bucket.
 
         Parameters
@@ -263,8 +263,8 @@ class SupabaseConnection(BaseConnection[Client]):
         bucket_id: str,
         public: Optional[bool] = False,
         file_size_limit: Optional[bool] = None,
-        allowed_mime_types: Optional[Union[str, list[str]]] = None,
-    ) -> dict[str, str]:
+        allowed_mime_types: Optional[Union[str, "list[str]"]] = None,
+    ) -> "dict[str, str]":
         """Update a storage bucket.
 
         Parameters
@@ -288,7 +288,7 @@ class SupabaseConnection(BaseConnection[Client]):
         response = self.client.storage._request("PUT", f"/bucket/{bucket_id}", json=json)
         return response.json()
 
-    def move(self, bucket_id: str, from_path: str, to_path: str) -> dict[str, str]:
+    def move(self, bucket_id: str, from_path: str, to_path: str) -> "dict[str, str]":
         """Moves an existing file, optionally renaming it at the same time.
 
         Parameters
@@ -311,7 +311,7 @@ class SupabaseConnection(BaseConnection[Client]):
         )
         return response.json()
 
-    def remove(self, bucket_id: str, paths: list) -> dict[str, str]:
+    def remove(self, bucket_id: str, paths: list) -> "dict[str, str]":
         """Deletes files within the same bucket
 
         Parameters
@@ -337,7 +337,7 @@ class SupabaseConnection(BaseConnection[Client]):
         sortby: Optional[Literal["name", "updated_at", "created_at", "last_accessed_at"]] = "name",
         order: Optional[Literal["asc", "desc"]] = "asc",
         ttl: Optional[Union[float, timedelta, str]] = None,
-    ) -> list[dict[str, str]]:
+    ) -> "list[dict[str, str]]":
         """Lists all the objects within a bucket.
 
         Parameters
@@ -374,9 +374,9 @@ class SupabaseConnection(BaseConnection[Client]):
     def create_signed_urls(
         self,
         bucket_id: str,
-        paths: list[str],
+        paths: "list[str]",
         expires_in: int,
-    ) -> list[dict[str, str]]:
+    ) -> "list[dict[str, str]]":
         """Parameters
         ----------
         bucket_id : str
@@ -424,7 +424,7 @@ class SupabaseConnection(BaseConnection[Client]):
 
         return _get_public_url(self, bucket_id, filepath)
 
-    def create_signed_upload_url(self, bucket_id: str, path: str) -> dict[str, str]:
+    def create_signed_upload_url(self, bucket_id: str, path: str) -> "dict[str, str]":
         """Parameters
         ----------
         bucket_id : str
@@ -459,7 +459,7 @@ class SupabaseConnection(BaseConnection[Client]):
         path: str,
         token: str,
         file: Union[str, Path, BytesIO],
-    ) -> dict[str, str]:
+    ) -> "dict[str, str]":
         """Upload a file with a token generated from `.create_signed_url()`
 
         Parameters
