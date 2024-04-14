@@ -74,7 +74,7 @@ with st.sidebar:
     social_media_links = [
         "https://www.facebook.com/sharer/sharer.php?kid_directed_site=0&sdk=joey&u=https%3A%2F%2Fst-supabase-connection.streamlit.app%2F&display=popup&ref=plugin&src=share_button",
         "https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fst-supabase-connection.streamlit.app%2F",
-        "https://twitter.com/intent/tweet?original_referer=http%3A%2F%2Flocalhost%3A8501%2F&ref_src=twsrc%5Etfw%7Ctwcamp%5Ebuttonembed%7Ctwterm%5Eshare%7Ctwgr%5E&text=Check%20out%20this%20Streamlit%20Supabase%20connection%20demo%20app%20%F0%9F%8E%88&url=https%3A%2F%2Fst-supabase-connection.streamlit.app%2F",
+        "https://x.com/intent/tweet?original_referer=http%3A%2F%2Flocalhost%3A8501%2F&ref_src=twsrc%5Etfw%7Ctwcamp%5Ebuttonembed%7Ctwterm%5Eshare%7Ctwgr%5E&text=Check%20out%20this%20Streamlit%20Supabase%20connection%20demo%20app%20%F0%9F%8E%88&url=https%3A%2F%2Fst-supabase-connection.streamlit.app%2F",
     ]
 
     social_media_icons = SocialMediaIcons(
