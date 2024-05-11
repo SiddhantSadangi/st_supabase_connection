@@ -1,15 +1,10 @@
 import contextlib
-import sys
-from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 from st_social_media_links import SocialMediaIcons
 
-path_root = Path(__file__).parents[1]
-sys.path.append(str(path_root))
-
-from src.st_supabase_connection import SupabaseConnection, __version__, execute_query
+from st_supabase_connection import SupabaseConnection, __version__, execute_query
 
 VERSION = __version__
 
