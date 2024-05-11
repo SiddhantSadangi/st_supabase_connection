@@ -949,16 +949,16 @@ if st.session_state["initialized"]:
             key="run_db_query",
         ):
             try:
-                data, count = eval(constructed_db_query)
+                response = eval(constructed_db_query)
 
                 if count_method:
                     st.write(
-                        f"**{count[-1]}** rows {request_builder}ed. `count` does not take `limit` into account."
+                        f"**{response.count}** rows {request_builder}ed. `count` does not take `limit` into account."
                     )
                 if view == "Dataframe":
-                    st.dataframe(data[-1], use_container_width=True)
+                    st.dataframe(response.data, use_container_width=True)
                 else:
-                    st.write(data[-1])
+                    st.write(response.data)
             except ValueError:
                 if count_method == "planned":
                     st.error(
