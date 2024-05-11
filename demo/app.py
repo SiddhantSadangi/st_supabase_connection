@@ -913,8 +913,6 @@ if st.session_state["initialized"]:
             )
 
             operators = operators.replace(".__init__()", "").replace(".execute()", "")
-            if not operators.startswith("."):
-                operators = "." + operators
 
         ttl = None if ttl == "" else ttl
 
