@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Literal, Optional, Tuple, Union
 
 from postgrest import (
+    APIResponse,
     SyncFilterRequestBuilder,
     SyncQueryRequestBuilder,
     SyncSelectRequestBuilder,
@@ -504,6 +505,7 @@ def execute_query(
             SyncSelectRequestBuilder: lambda x: hash(x.path + str(x.params)),
             SyncQueryRequestBuilder: lambda x: hash(x.path + str(x.params)),
             SyncFilterRequestBuilder: lambda x: hash(x.path + str(x.params)),
+            APIResponse: lambda x: hash(x.json()),
         },
     )
     def _execute(query):
