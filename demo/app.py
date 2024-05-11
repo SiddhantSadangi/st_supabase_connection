@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 from st_social_media_links import SocialMediaIcons
 
-from st_supabase_connection import SupabaseConnection, __version__
+from st_supabase_connection import SupabaseConnection, __version__, execute_query
 
 VERSION = __version__
 
@@ -53,7 +53,7 @@ with st.sidebar:
         )
 
     if st.button(
-        "Clear the cache to fetch latest data🧹",
+        "Clear cache to fetch latest data🧹",
         use_container_width=True,
         type="primary",
     ):
@@ -797,7 +797,7 @@ if st.session_state["initialized"]:
                 placeholder="countries",
             )
 
-        lcol, mcol, rcol = st.columns(3)
+        lcol, mcol, rcol = st.columns([2, 2, 3])
         request_builder = lcol.selectbox(
             "Select the query type",
             options=["select", "insert", "upsert", "update", "delete"],
@@ -820,33 +820,59 @@ if st.session_state["initialized"]:
             placeholder = (
                 value
             ) = """[{"name":"Wakanda","iso2":"WK"},{"name":"Wadiya","iso2":"WD"}]"""
-            upsert = rcol_placeholder.checkbox(
+            rcol1, rcol2 = rcol_placeholder.columns(2)
+            ttl = rcol1.text_input(
+                "Cache duration",
+                value=0,
+                placeholder=0,
+                help="Set as `0` to always fetch the latest results (recommended for DML), or leave blank to cache indefinitely.",
+            )
+            upsert = rcol2.checkbox(
                 label="Upsert",
                 help="Whether the query should be an upsert",
             )
         elif request_builder == "select":
             request_builder_query_label = "Enter the columns to fetch as comma-separated strings"
-            placeholder = value = "*"
             ttl = rcol_placeholder.text_input(
                 "Result cache duration",
-                value=0,
+                value=None,
                 placeholder=None,
-                help="Set as `0` to always fetch the latest results, and leave blank to cache indefinitely.",
+                help="Set as `0` to always fetch the latest results, or leave blank to cache indefinitely.",
             )
             placeholder = value = "*"
         elif request_builder == "delete":
             request_builder_query_label = "Delete query"
             placeholder = value = "Delete does not take a request builder query"
+            ttl = rcol_placeholder.text_input(
+                "Results Cache duration",
+                value=0,
+                placeholder=0,
+                help="Set as `0` to always fetch the latest results (recommended for DML), or leave blank to cache indefinitely.",
+            )
         elif request_builder == "upsert":
             request_builder_query_label = "Enter the rows to upsert as json (for single row) or array of jsons (for multiple rows)"
             placeholder = value = """{"name":"Wakanda","iso2":"WK", "continent":"Africa"}"""
-            ignore_duplicates = rcol_placeholder.checkbox(
+            rcol1, rcol2 = rcol_placeholder.columns(2)
+            ttl = rcol1.text_input(
+                "Cache duration",
+                value=0,
+                placeholder=0,
+                help="Set as `0` to always fetch the latest results (recommended for DML), or leave blank to cache indefinitely.",
+            )
+            ignore_duplicates = rcol2.checkbox(
                 label="Ignore duplicates",
                 help="Whether duplicate rows should be ignored",
             )
         elif request_builder == "update":
             request_builder_query_label = "Enter the rows to update as json (for single row) or array of jsons (for multiple rows)"
             placeholder = value = """{"iso3":"N/A","continent":"N/A"}"""
+            ttl = rcol_placeholder.text_input(
+                "Result cache duration",
+                value=0,
+                placeholder=0,
+                help="Set as `0` to always fetch the latest results (recommended for DML), or leave blank to cache indefinitely.",
+            )
+
         request_builder_query = st.text_input(
             label=request_builder_query_label,
             placeholder=placeholder,
@@ -854,7 +880,6 @@ if st.session_state["initialized"]:
             help="[RequestBuilder API reference](https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html#postgrest.AsyncRequestBuilder)",
             disabled=request_builder == "delete",
         )
-
         if request_builder == "upsert" and not ignore_duplicates:
             on_conflict = st.text_input(
                 label="Enter the columns to be considered UNIQUE in case of conflicts as comma-separated values",
@@ -876,29 +901,29 @@ if st.session_state["initialized"]:
 
         if request_builder not in ["insert", "update", "upsert"]:
             operators = st.text_input(
-                label="Chain any operators and filters you want 🔗",
+                label="Chain any modifiers and filters you want 🔗",
                 value=""".eq("continent","Asia").order("name",desc=True).limit(5)""",
                 placeholder=""".eq("continent","Asia").order("name",desc=True).limit(5)""",
                 help="List of all available [operators](https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html#postgrest.AsyncSelectRequestBuilder) and [filters](https://postgrest-py.readthedocs.io/en/latest/api/filters.html#postgrest.AsyncFilterRequestBuilder)",
             )
 
             operators = operators.replace(".__init__()", "").replace(".execute()", "")
+            if not operators.startswith("."):
+                operators = "." + operators
 
         ttl = None if ttl == "" else ttl
 
         if operators:
             if request_builder == "select":
-                constructed_db_query = f"""st_supabase.query({request_builder_query}, {table=}, {ttl=}){operators}.execute()"""
+                constructed_db_query = f"""execute_query(st_supabase.table("{table}").select({request_builder_query}){operators}, {ttl=})"""
             else:
-                constructed_db_query = f"""st_supabase.table("{table}").{request_builder}({request_builder_query}){operators}.execute()"""
+                constructed_db_query = f"""execute_query(st_supabase.table("{table}").{request_builder}({request_builder_query}){operators}, {ttl=})"""
         else:
             if request_builder == "select":
-                constructed_db_query = (
-                    f"""st_supabase.query({request_builder_query}, {table=}, {ttl=}).execute()"""
-                )
+                constructed_db_query = f"""execute_query(st_supabase.table("{table}").select({request_builder_query}), {ttl=})"""
             else:
-                constructed_db_query = f"""st_supabase.table("{table}").{request_builder}({request_builder_query}).execute()"""
-        st.write("**Constructed code**")
+                constructed_db_query = f"""execute_query(st_supabase.table("{table}").{request_builder}({request_builder_query}), {ttl=})"""
+        st.write("**Constructed query**")
         st.code(constructed_db_query)
 
         lcol, rcol = st.columns([2, 1])
@@ -909,7 +934,7 @@ if st.session_state["initialized"]:
         )
 
         if rcol.button(
-            "Run query 🏃",
+            "Execute query 🏃",
             use_container_width=True,
             type="primary",
             disabled=st.session_state["project"] == "demo"
@@ -1082,7 +1107,7 @@ st_supabase.auth.verify_otp(dict(type="magiclink", email=email, token=token))
                 if auth_success_message:
                     st.success(auth_success_message)
 
-                if response != None:
+                if response is not None:
                     with st.expander("JSON response"):
                         st.write(response.dict())
 
