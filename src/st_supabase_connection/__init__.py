@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Literal, Optional, Tuple, Union
 
 from postgrest import (
+    APIResponse,
     SyncFilterRequestBuilder,
     SyncQueryRequestBuilder,
     SyncSelectRequestBuilder,
@@ -15,7 +16,7 @@ from streamlit import cache_data, cache_resource
 from streamlit.connections import BaseConnection
 from supabase import Client, create_client
 
-__version__ = "1.3.0"
+__version__ = "2.0.0"
 
 
 class SupabaseConnection(BaseConnection[Client]):
@@ -481,9 +482,9 @@ class SupabaseConnection(BaseConnection[Client]):
 
 
 def execute_query(
-    query: SyncSelectRequestBuilder,
+    query: Union[SyncSelectRequestBuilder, SyncQueryRequestBuilder, SyncFilterRequestBuilder],
     ttl: Optional[Union[float, timedelta, str]] = None,
-):
+) -> APIResponse:
     """Execute the query.
     This function is a wrapper around the `query.execute()` method, with caching enabled.
     This works with all types of queries, but caching may lead to unexpected results when running DML queries.
@@ -492,18 +493,21 @@ def execute_query(
 
     Parameters
     ----------
-    query : SyncSelectRequestBuilder
+    query : SyncSelectRequestBuilder, SyncQueryRequestBuilder, SyncFilterRequestBuilder
         The query to execute. Can contain any number of chained filters and operators.
     ttl : float, timedelta, str, or None
         The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
     """
 
+    def _hash_func(x):
+        return hash(x.path + str(x.params))
+
     @cache_resource(
         ttl=ttl,
         hash_funcs={
-            SyncSelectRequestBuilder: lambda x: hash(x.path + str(x.params)),
-            SyncQueryRequestBuilder: lambda x: hash(x.path + str(x.params)),
-            SyncFilterRequestBuilder: lambda x: hash(x.path + str(x.params)),
+            SyncSelectRequestBuilder: _hash_func,
+            SyncQueryRequestBuilder: _hash_func,
+            SyncFilterRequestBuilder: _hash_func,
         },
     )
     def _execute(query):

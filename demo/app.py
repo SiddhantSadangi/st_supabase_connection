@@ -298,11 +298,11 @@ if st.session_state["initialized"]:
             )
             ttl = None if ttl == "" else ttl
             constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}", {ttl=})"""
-            st.session_state["storage_disabled"] = False if bucket_id else True
+            st.session_state["storage_disabled"] = bool(not bucket_id)
 
         elif operation in ["delete_bucket", "empty_bucket"]:
             constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}")"""
-            st.session_state["storage_disabled"] = False if bucket_id else True
+            st.session_state["storage_disabled"] = bool(not bucket_id)
 
         elif operation == "create_bucket":
             col1, col2, col3, col4 = st.columns(4)
@@ -335,7 +335,7 @@ if st.session_state["initialized"]:
             )
 
             constructed_storage_query = f"""st_supabase.create_bucket('{bucket_id}',{name=},{file_size_limit=},allowed_mime_types={allowed_mime_types},{public=})"""
-            st.session_state["storage_disabled"] = False if bucket_id else True
+            st.session_state["storage_disabled"] = bool(not bucket_id)
 
         elif operation == "update_bucket":
             if bucket_id:
@@ -412,7 +412,7 @@ if st.session_state["initialized"]:
                 constructed_storage_query = f"""
                 st_supabase.{operation}("{bucket_id}", {source=}, {file=}, destination_path="{destination_path}", {overwrite=})
                 """
-            st.session_state["storage_disabled"] = False if all([bucket_id, file]) else True
+            st.session_state["storage_disabled"] = bool(not all([bucket_id, file]))
         elif operation == "list_buckets":
             ttl = st.text_input(
                 "Results cache duration",
@@ -441,7 +441,7 @@ if st.session_state["initialized"]:
             constructed_storage_query = (
                 f"""st_supabase.{operation}("{bucket_id}", {source_path=}, {ttl=})"""
             )
-            st.session_state["storage_disabled"] = False if all([bucket_id, source_path]) else True
+            st.session_state["storage_disabled"] = bool(not all([bucket_id, source_path]))
 
         elif operation == "move":
             from_path = st.text_input(
@@ -457,9 +457,7 @@ if st.session_state["initialized"]:
                 f"""st_supabase.{operation}("{bucket_id}", {from_path=}, {to_path=})"""
             )
 
-            st.session_state["storage_disabled"] = (
-                False if all([bucket_id, from_path, to_path]) else True
-            )
+            st.session_state["storage_disabled"] = bool(not all([bucket_id, from_path, to_path]))
         elif operation == "remove":
             paths = st.text_input(
                 "Enter the paths of the objects in the bucket to remove",
@@ -468,7 +466,7 @@ if st.session_state["initialized"]:
             )
             constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}", paths={paths})"""
 
-            st.session_state["storage_disabled"] = False if all([bucket_id, paths]) else True
+            st.session_state["storage_disabled"] = bool(not all([bucket_id, paths]))
         elif operation == "list_objects":
             lcol, rcol = st.columns([3, 1])
             path = lcol.text_input(
@@ -912,15 +910,15 @@ if st.session_state["initialized"]:
         ttl = None if ttl == "" else ttl
 
         if operators:
-            if request_builder == "select":
-                constructed_db_query = f"""execute_query(st_supabase.table("{table}").select({request_builder_query}){operators}, {ttl=})"""
-            else:
-                constructed_db_query = f"""execute_query(st_supabase.table("{table}").{request_builder}({request_builder_query}){operators}, {ttl=})"""
+            constructed_db_query = (
+                f"""execute_query(st_supabase.table("{table}").select({request_builder_query}){operators}, {ttl:=})"""
+                if request_builder == "select"
+                else f"""execute_query(st_supabase.table("{table}").{request_builder}({request_builder_query}){operators}, {ttl:=})"""
+            )
+        elif request_builder == "select":
+            constructed_db_query = f"""execute_query(st_supabase.table("{table}").select({request_builder_query}), {ttl=})"""
         else:
-            if request_builder == "select":
-                constructed_db_query = f"""execute_query(st_supabase.table("{table}").select({request_builder_query}), {ttl=})"""
-            else:
-                constructed_db_query = f"""execute_query(st_supabase.table("{table}").{request_builder}({request_builder_query}), {ttl=})"""
+            constructed_db_query = f"""execute_query(st_supabase.table("{table}").{request_builder}({request_builder_query}), {ttl=})"""
         st.write("**Constructed query**")
         st.code(constructed_db_query)
 
@@ -1098,9 +1096,6 @@ st_supabase.auth.verify_otp(dict(type="magiclink", email=email, token=token))
                         )
                     else:
                         raise Exception("No logged-in user session. Log in or sign up first.")
-
-                elif auth_operation == "sign_out":
-                    auth_success_message = None
 
                 if auth_success_message:
                     st.success(auth_success_message)
