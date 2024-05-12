@@ -3,6 +3,7 @@ import contextlib
 import pandas as pd
 import streamlit as st
 from st_social_media_links import SocialMediaIcons
+from streamlit.components.v1 import html as st_html
 
 from st_supabase_connection import SupabaseConnection, __version__, execute_query
 
@@ -61,7 +62,7 @@ with st.sidebar:
         st.cache_resource.clear()
         st.success("Cache cleared")
 
-    st.components.v1.html(sidebar_html, height=247)
+    st_html(sidebar_html, height=247)
 
     st.html(
         """
