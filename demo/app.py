@@ -911,9 +911,9 @@ if st.session_state["initialized"]:
 
         if operators:
             constructed_db_query = (
-                f"""execute_query(st_supabase.table("{table}").select({request_builder_query}){operators}, {ttl:=})"""
+                f"""execute_query(st_supabase.table("{table}").select({request_builder_query}){operators}, {ttl=})"""
                 if request_builder == "select"
-                else f"""execute_query(st_supabase.table("{table}").{request_builder}({request_builder_query}){operators}, {ttl:=})"""
+                else f"""execute_query(st_supabase.table("{table}").{request_builder}({request_builder_query}){operators}, {ttl=})"""
             )
         elif request_builder == "select":
             constructed_db_query = f"""execute_query(st_supabase.table("{table}").select({request_builder_query}), {ttl=})"""
