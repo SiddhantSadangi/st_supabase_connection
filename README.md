@@ -158,7 +158,7 @@ pip install st-supabase-connection
 
 1. Import
   ```python
-  from st_supabase_connection import SupabaseConnection
+  from st_supabase_connection import SupabaseConnection, execute_query
   ```
 2. Initialize
   ```python
@@ -170,7 +170,7 @@ pip install st-supabase-connection
       key="YOUR_SUPABASE_KEY", # not needed if provided as a streamlit secret
   )
   ```
-3. Use in your app to query tables and files. Happy Streamlit-ing! :balloon:
+3. Use in your app to query tables and files, and add authentication. Happy Streamlit-ing! :balloon:
 
 ## :ok_hand: Supported methods
 <details close>
@@ -197,7 +197,7 @@ pip install st-supabase-connection
 <details close>
 <summary> Database </summary>
 <ul>
-    <li> <code>query()</code> - Runs a cached SELECT query </li>
+    <li> <code>execute_query()</code> - Executes the passed query with caching enabled. </li>
     <li> All methods supported by <a href="https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html">postgrest-py</a>.
 </details>
 
@@ -300,7 +300,7 @@ SyncBucket(id='new_bucket', name='new_bucket', owner='', public=True, created_at
 ### :file_cabinet: Database operations
 #### Simple query 
 ```python
->>> st_supabase_client.query("*", table="countries", ttl=0).execute()
+>>> execute_query(st_supabase_client.table("countries").select("*"), ttl=0)
 APIResponse(
     data=[
         {"id": 1, "name": "Afghanistan"},
@@ -312,20 +312,25 @@ APIResponse(
 ```
 #### Query with join
 ```python
->>> st_supabase_client.query("name, teams(name)", table="users",  count="exact", ttl="1h").execute()
+>>> execute_query(
+        st_supabase_client.table("users").select("name, teams(name)", count="exact"), 
+        ttl="1h",
+    )
+    
 APIResponse(
     data=[
         {"name": "Kiran", "teams": [{"name": "Green"}, {"name": "Blue"}]},
         {"name": "Evan", "teams": [{"name": "Blue"}]},
     ],
-    count=None,
+    count=2,
 )
 ```
 #### Filter through foreign tables
 ```python
->>> st_supabase_client.query("name, countries(*)", count="exact", table="cities", ttl=None).eq(
-        "countries.name", "Curaçao"
-    ).execute()
+>>> execute_query(
+        st_supabase_client.table("cities").select("name, countries(*)", count="exact").eq("countries.name", "Curaçao"),
+        ttl=None,
+    )
 
 APIResponse(
     data=[
@@ -348,9 +353,13 @@ APIResponse(
 
 #### Insert rows
 ```python
->>> st_supabase_client.table("countries").insert(
-        [{"name": "Wakanda", "iso2": "WK"}, {"name": "Wadiya", "iso2": "WD"}], count="None"
-    ).execute()
+>>> execute_query(
+        st_supabase_client.table("countries").insert(
+            [{"name": "Wakanda", "iso2": "WK"}, {"name": "Wadiya", "iso2": "WD"}], count="None"
+        ),
+        ttl=0,
+    )
+    
 APIResponse(
     data=[
         {

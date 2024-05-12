@@ -1,2 +1,3 @@
 st-social-media-links
 st_supabase_connection
+streamlit<1.34 # TODO: Update app to remove components.v1 usage

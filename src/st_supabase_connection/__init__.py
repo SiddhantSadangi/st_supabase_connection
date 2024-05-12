@@ -4,14 +4,19 @@ import urllib
 from datetime import timedelta
 from io import BytesIO
 from pathlib import Path
-from typing import Literal, Optional, Tuple, Union, types
+from typing import Literal, Optional, Tuple, Union
 
-from postgrest import SyncSelectRequestBuilder, types
+from postgrest import (
+    APIResponse,
+    SyncFilterRequestBuilder,
+    SyncQueryRequestBuilder,
+    SyncSelectRequestBuilder,
+)
 from streamlit import cache_data, cache_resource
 from streamlit.connections import BaseConnection
 from supabase import Client, create_client
 
-__version__ = "1.2.2"
+__version__ = "2.0.0"
 
 
 class SupabaseConnection(BaseConnection[Client]):
@@ -65,33 +70,6 @@ class SupabaseConnection(BaseConnection[Client]):
         self.auth = self.client.auth
         self.delete_bucket = self.client.storage.delete_bucket
         self.empty_bucket = self.client.storage.empty_bucket
-
-    def query(
-        self,
-        *columns: str,
-        table: str,
-        count: Optional[types.CountMethod] = None,
-        ttl: Optional[Union[float, timedelta, str]] = None,
-    ) -> SyncSelectRequestBuilder:
-        """Run a SELECT query.
-
-        Parameters
-        ----------
-        *columns : str
-            The names of the columns to fetch.
-        table : str
-            The table to run the query on.
-        count : str
-            The method to use to get the count of rows returned. Defaults to `None`.
-        ttl : float, timedelta, str, or None
-            The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
-        """
-
-        @cache_resource(ttl=ttl)
-        def _query(_self, *columns, table, count):
-            return _self.client.table(table).select(*columns, count=count)
-
-        return _query(self, *columns, table=table, count=count)
 
     def get_bucket(
         self,
@@ -501,3 +479,38 @@ class SupabaseConnection(BaseConnection[Client]):
                 )
 
         return response.json()
+
+
+def execute_query(
+    query: Union[SyncSelectRequestBuilder, SyncQueryRequestBuilder, SyncFilterRequestBuilder],
+    ttl: Optional[Union[float, timedelta, str]] = None,
+) -> APIResponse:
+    """Execute the query.
+    This function is a wrapper around the `query.execute()` method, with caching enabled.
+    This works with all types of queries, but caching may lead to unexpected results when running DML queries.
+
+    It is recommended to set `ttl` to 0 for DML queries (insert, update, upsert, delete) to avoid caching issues.
+
+    Parameters
+    ----------
+    query : SyncSelectRequestBuilder, SyncQueryRequestBuilder, SyncFilterRequestBuilder
+        The query to execute. Can contain any number of chained filters and operators.
+    ttl : float, timedelta, str, or None
+        The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
+    """
+
+    def _hash_func(x):
+        return hash(x.path + str(x.params))
+
+    @cache_resource(
+        ttl=ttl,
+        hash_funcs={
+            SyncSelectRequestBuilder: _hash_func,
+            SyncQueryRequestBuilder: _hash_func,
+            SyncFilterRequestBuilder: _hash_func,
+        },
+    )
+    def _execute(query):
+        return query.execute()
+
+    return _execute(query)
