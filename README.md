@@ -492,27 +492,38 @@ APIResponse(
 
 #### Create new user
 ```python
->>> st_supabase_client.auth.sign_up(dict(email='test.user@abc.com', password='***', options=dict(data=dict(fname='Siddhant',attribution='I made it :)'))))
+st_supabase_client.auth.sign_up(
+    dict(
+        email='test.user@abc.com',
+        password='***',
+        options=dict(
+            data=dict(
+                fname='Siddhant',
+                attribution='I made it :)',
+            )
+        )
+    )
+)
 ```
 
 #### Sign in with password
 ```python
->>> st_supabase_client.auth.sign_in_with_password(dict(email='test.user@abc.com', password='***'))
+st_supabase_client.auth.sign_in_with_password(dict(email='test.user@abc.com', password='***'))
 ```
 
 #### Retrieve session
 ```python
->>> st_supabase.auth.get_session()
+st_supabase.auth.get_session()
 ```
 
 #### Retrieve user
 ```python
->>> st_supabase.auth.get_user()
+st_supabase.auth.get_user()
 ```
 
 #### Sign out
 ```python
->>> st_supabase.auth.sign_out()
+st_supabase.auth.sign_out()
 ```
 
 > [!NOTE]  
