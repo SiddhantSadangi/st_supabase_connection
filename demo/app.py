@@ -56,7 +56,6 @@ with st.sidebar:
     if st.button(
         "Clear cache to fetch latest data🧹",
         use_container_width=True,
-        type="primary",
     ):
         st.cache_data.clear()
         st.cache_resource.clear()
@@ -103,8 +102,8 @@ with st.sidebar:
 # ---------- MAIN PAGE ----------
 st.header("🔌Supabase Connection for Streamlit", divider="violet")
 
-st.write(
-    "🧑‍🎓 Demo and tutorial for [st_supabase_connection](https://github.com/SiddhantSadangi/st_supabase_connection)."
+st.caption(
+    "🧑‍🎓 Demo and tutorial for [st_supabase_connection](https://github.com/SiddhantSadangi/st_supabase_connection), an easy-to-use Supabase connector for Streamlit that caches your API calls to make querying fast and cheap."
 )
 
 st.subheader("🏗️ Initialize Connection")
@@ -816,9 +815,9 @@ if st.session_state["initialized"]:
 
         if request_builder == "insert":
             request_builder_query_label = "Enter the rows to insert as json (for single row) or array of jsons (for multiple rows)"
-            placeholder = (
-                value
-            ) = """[{"name":"Wakanda","iso2":"WK"},{"name":"Wadiya","iso2":"WD"}]"""
+            placeholder = value = (
+                """[{"name":"Wakanda","iso2":"WK"},{"name":"Wadiya","iso2":"WD"}]"""
+            )
             rcol1, rcol2 = rcol_placeholder.columns(2)
             ttl = rcol1.text_input(
                 "Cache duration",
@@ -936,10 +935,12 @@ if st.session_state["initialized"]:
             type="primary",
             disabled=st.session_state["project"] == "demo"
             and request_builder in ["insert", "upsert", "update", "delete"],
-            help=f"{request_builder.upper()} not allowed in demo project"
-            if st.session_state["project"] == "demo"
-            and request_builder in ["insert", "upsert", "update", "delete"]
-            else None,
+            help=(
+                f"{request_builder.upper()} not allowed in demo project"
+                if st.session_state["project"] == "demo"
+                and request_builder in ["insert", "upsert", "update", "delete"]
+                else None
+            ),
             key="run_db_query",
         ):
             try:
