@@ -7,3 +7,6 @@ secondaryBackgroundColor="#45164f"
 [server]
 enableXsrfProtection = false
 enableCORS = false
+
+[client]
+toolbarMode = "minimal"
