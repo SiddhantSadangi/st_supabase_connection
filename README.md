@@ -4,7 +4,12 @@
 A Streamlit connection component to connect Streamlit to Supabase Storage, Database, and Auth.
 
 ## :student: Interactive tutorial
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-supabase-connection.streamlit.app/)
+<div align="center">
+    <a href="https://st-supabase-connection.streamlit.app/">
+        <img src="https://static.streamlit.io/badges/streamlit_badge_black_white.svg" alt="Open in Streamlit" style="height: 60px !important;width: 217px !important;">
+    </a>
+</div>
+
 ![Web capture_2-12-2023_124639_st-supabase-connection streamlit app](https://github.com/SiddhantSadangi/st_supabase_connection/assets/41324509/2870b021-48a0-4143-9693-c840880a28be)
 
 
@@ -166,8 +171,6 @@ pip install st-supabase-connection
       name="YOUR_CONNECTION_NAME",
       type=SupabaseConnection,
       ttl=None,
-      url="YOUR_SUPABASE_URL", # not needed if provided as a streamlit secret
-      key="YOUR_SUPABASE_KEY", # not needed if provided as a streamlit secret
   )
   ```
 3. Use in your app to query tables and files, and add authentication. Happy Streamlit-ing! :balloon:
