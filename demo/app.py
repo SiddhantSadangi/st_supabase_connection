@@ -146,7 +146,7 @@ with st.expander("**Select project**", expanded=not st.session_state["initialize
                     name="supabase_connection", type=SupabaseConnection, {ttl=}
                     )
                 """,
-                language="python",
+                wrap_lines=True,
             )
 
     with custom_tab:
@@ -196,7 +196,7 @@ with st.expander("**Select project**", expanded=not st.session_state["initialize
                         key=key, 
                     )
                     """,
-                    language="python",
+                    wrap_lines=True,
                 )
 
 if st.session_state["initialized"]:
@@ -601,10 +601,10 @@ if st.session_state["initialized"]:
         if operation == "download":
             st.code(
                 f"file_name, mime, data = {constructed_storage_query}",
-                language="python",
+                wrap_lines=True,
             )
         else:
-            st.code(constructed_storage_query, language="python")
+            st.code(constructed_storage_query, wrap_lines=True)
 
         if st.session_state["project"] == "demo" and operation in RESTRICTED_STORAGE_OPERATORS:
             st.session_state["storage_disabled"] = True
@@ -720,9 +720,9 @@ if st.session_state["initialized"]:
                         st.write("Signed URL")
                         st.info(f"{response['signed_url']}", icon="🔗")
                         st.write("Token")
-                        st.code(response["token"], language="text")
+                        st.code(response["token"], language="text", wrap_lines=True)
                         st.write("Path")
-                        st.code(response["path"])
+                        st.code(response["path"], wrap_lines=True)
                     elif operation == "upload_to_signed_url":
                         if response["Key"] == f"{bucket_id}/{path.lstrip('/')}":
                             try:
@@ -920,7 +920,7 @@ if st.session_state["initialized"]:
         else:
             constructed_db_query = f"""execute_query(st_supabase.table("{table}").{request_builder}({request_builder_query}), {ttl=})"""
         st.write("**Constructed query**")
-        st.code(constructed_db_query)
+        st.code(constructed_db_query, wrap_lines=True)
 
         lcol, rcol = st.columns([2, 1])
         view = lcol.radio(
@@ -1069,7 +1069,7 @@ st_supabase.auth.verify_otp(dict(type="magiclink", email=email, token=token))
 
         if constructed_auth_query:
             st.write("**Constructed code**")
-            st.code(constructed_auth_query)
+            st.code(constructed_auth_query, wrap_lines=True)
 
         if st.button(
             "Execute 🪄",
