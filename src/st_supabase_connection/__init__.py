@@ -192,7 +192,7 @@ class SupabaseConnection(BaseConnection[Client]):
                         "x-upsert": overwrite,
                     },
                 )
-        return response.json()
+        return response
 
     def download(
         self,
@@ -374,9 +374,9 @@ class SupabaseConnection(BaseConnection[Client]):
         data = response.json()
         for item in data:
             if item["signedURL"]:
-                item[
-                    "signedURL"
-                ] = f"{self.client.storage._client.base_url}{item['signedURL'].lstrip('/')}"
+                item["signedURL"] = (
+                    f"{self.client.storage._client.base_url}{item['signedURL'].lstrip('/')}"
+                )
 
         return data
 

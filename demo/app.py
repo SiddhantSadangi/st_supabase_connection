@@ -5,7 +5,8 @@ import streamlit as st
 from st_social_media_links import SocialMediaIcons
 from streamlit.components.v1 import html as st_html
 
-from st_supabase_connection import SupabaseConnection, __version__, execute_query
+from st_supabase_connection import execute_query  # noqa: F401
+from st_supabase_connection import SupabaseConnection, __version__
 
 VERSION = __version__
 
@@ -341,7 +342,6 @@ if st.session_state["initialized"]:
             if bucket_id:
                 try:
                     current_props = st_supabase.get_bucket(bucket_id)
-
                     st.info("Current properties fetched. Update values to update properties.")
                     col1, col2, col3 = st.columns(3)
 
@@ -681,16 +681,16 @@ if st.session_state["initialized"]:
                         )
                     elif (
                         operation == "upload"
-                        and response["Key"] == f"{bucket_id}/{destination_path.lstrip('/')}"
+                        and response.full_path == f"{bucket_id}/{destination_path.lstrip('/')}"
                     ):
                         try:
                             st.success(
-                                f"Uploaded **{file.name}** to **{response['Key']}**",
+                                f"Uploaded **{file.name}** to **{response.full_path}**",
                                 icon="✅",
                             )
                         except AttributeError:
                             st.success(
-                                f"Uploaded **{file}** to **{response['Key']}**",
+                                f"Uploaded **{file}** to **{response.full_path}**",
                                 icon="✅",
                             )
                     elif operation == "remove":
