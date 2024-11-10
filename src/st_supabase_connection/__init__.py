@@ -16,7 +16,7 @@ from streamlit import cache_data, cache_resource
 from streamlit.connections import BaseConnection
 from supabase import Client, create_client
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 
 
 class SupabaseConnection(BaseConnection[Client]):
