@@ -510,7 +510,7 @@ if st.session_state["initialized"]:
 
             constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}", {path=}, {limit=}, {offset=}, {sortby=}, {order=}, {ttl=})"""
 
-            st.session_state["storage_disabled"] = False if bucket_id else True
+            st.session_state["storage_disabled"] = not bool(bucket_id)
 
         elif operation == "get_public_url":
             lcol, rcol = st.columns([3, 1])
@@ -529,7 +529,7 @@ if st.session_state["initialized"]:
             constructed_storage_query = (
                 f"""st_supabase.get_public_url("{bucket_id}",{filepath=}, {ttl=})"""
             )
-            st.session_state["storage_disabled"] = False if all([bucket_id, filepath]) else True
+            st.session_state["storage_disabled"] = bool(not all([bucket_id, filepath]))
 
         elif operation == "create_signed_urls":
             lcol, rcol = st.columns([2, 1])
@@ -547,9 +547,7 @@ if st.session_state["initialized"]:
             constructed_storage_query = (
                 f"""st_supabase.create_signed_urls("{bucket_id}",paths={paths}, {expires_in=})"""
             )
-            st.session_state["storage_disabled"] = (
-                False if all([bucket_id, paths, expires_in]) else True
-            )
+            st.session_state["storage_disabled"] = bool(not all([bucket_id, paths, expires_in]))
 
         elif operation == "create_signed_upload_url":
             path = st.text_input(
@@ -559,7 +557,7 @@ if st.session_state["initialized"]:
             constructed_storage_query = (
                 f"""st_supabase.create_signed_upload_url("{bucket_id}",{path=})"""
             )
-            st.session_state["storage_disabled"] = False if all([bucket_id, path]) else True
+            st.session_state["storage_disabled"] = bool(not all([bucket_id, path]))
 
         elif operation == "upload_to_signed_url":
             path = None
@@ -595,7 +593,7 @@ if st.session_state["initialized"]:
                 constructed_storage_query = f"""
                 st_supabase.{operation}("{bucket_id}", {source=}, {path=}, token="***", {file=}, {overwrite=})
                 """
-            st.session_state["storage_disabled"] = False if all([bucket_id, token, path]) else True
+            st.session_state["storage_disabled"] = bool(not all([bucket_id, token, path]))
 
         st.write("**Constructed code**")
         if operation == "download":
@@ -1097,7 +1095,9 @@ st_supabase.auth.verify_otp(dict(type="magiclink", email=email, token=token))
                             else None
                         )
                     else:
-                        raise Exception("No logged-in user session. Log in or sign up first.")
+                        raise Exception(  # sourcery skip: raise-specific-error
+                            "No logged-in user session. Log in or sign up first."
+                        )
 
                 if auth_success_message:
                     st.success(auth_success_message)
