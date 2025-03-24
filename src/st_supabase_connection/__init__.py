@@ -307,9 +307,7 @@ class SupabaseConnection(BaseConnection[Client]):
             "file_size_limit": file_size_limit,
             "allowed_mime_types": allowed_mime_types,
         }
-        response = self.client.storage._request(
-            "PUT", f"/bucket/{bucket_id}", json=json
-        )
+        response = self.client.storage._request("PUT", f"/bucket/{bucket_id}", json=json)
         return response.json()
 
     def move(self, bucket_id: str, from_path: str, to_path: str) -> "dict[str, str]":
@@ -358,9 +356,7 @@ class SupabaseConnection(BaseConnection[Client]):
         path: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
-        sortby: Optional[
-            Literal["name", "updated_at", "created_at", "last_accessed_at"]
-        ] = "name",
+        sortby: Optional[Literal["name", "updated_at", "created_at", "last_accessed_at"]] = "name",
         order: Optional[Literal["asc", "desc"]] = "asc",
         ttl: Optional[Union[float, timedelta, str]] = None,
     ) -> "list[dict[str, str]]":
@@ -530,9 +526,7 @@ class SupabaseConnection(BaseConnection[Client]):
 
 
 def execute_query(
-    query: Union[
-        SyncSelectRequestBuilder, SyncQueryRequestBuilder, SyncFilterRequestBuilder
-    ],
+    query: Union[SyncSelectRequestBuilder, SyncQueryRequestBuilder, SyncFilterRequestBuilder],
     ttl: Optional[Union[float, timedelta, str]] = None,
 ) -> APIResponse:
     """Execute the query.
