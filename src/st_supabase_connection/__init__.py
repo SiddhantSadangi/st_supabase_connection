@@ -99,7 +99,7 @@ class SupabaseConnection(BaseConnection[Client]):
         credentials: SignInWithPasswordCredentials,
         ttl: Optional[Union[float, timedelta, str]] = None,
     ) -> None:
-        """Sign in with email and password.
+        """Sign in with email and password or phone number and password, with caching enabled.
 
         Parameters
         ----------
