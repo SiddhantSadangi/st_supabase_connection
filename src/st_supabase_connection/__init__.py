@@ -4,7 +4,7 @@ import urllib
 from datetime import timedelta
 from io import BytesIO
 from pathlib import Path
-from typing import Literal, Optional, Tuple, Union
+from typing import Any, Literal, NotRequired, Optional, Tuple, TypedDict, Union
 
 from postgrest import (
     APIResponse,
@@ -17,6 +17,29 @@ from streamlit.connections import BaseConnection
 from supabase import Client, create_client
 
 __version__ = "2.0.1"
+
+
+class SignInWithPasswordCredentialsOptions(TypedDict):
+    data: NotRequired[Any]
+    captcha_token: NotRequired[str]
+
+
+class SignInWithEmailAndPasswordCredentials(TypedDict):
+    email: str
+    password: str
+    options: NotRequired[SignInWithPasswordCredentialsOptions]
+
+
+class SignInWithPhoneAndPasswordCredentials(TypedDict):
+    phone: str
+    password: str
+    options: NotRequired[SignInWithPasswordCredentialsOptions]
+
+
+SignInWithPasswordCredentials = Union[
+    SignInWithEmailAndPasswordCredentials,
+    SignInWithPhoneAndPasswordCredentials,
+]
 
 
 class SupabaseConnection(BaseConnection[Client]):
@@ -70,6 +93,27 @@ class SupabaseConnection(BaseConnection[Client]):
         self.auth = self.client.auth
         self.delete_bucket = self.client.storage.delete_bucket
         self.empty_bucket = self.client.storage.empty_bucket
+
+    def cached_sign_in_with_password(
+        self,
+        credentials: SignInWithPasswordCredentials,
+        ttl: Optional[Union[float, timedelta, str]] = None,
+    ) -> None:
+        """Sign in with email and password.
+
+        Parameters
+        ----------
+        credentials : dict
+            The credentials to sign in with. This can be an email and password, or a phone number and password.
+        ttl : float, timedelta, str, or None
+            The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
+        """
+
+        @cache_resource(ttl=ttl)
+        def _sign_in_with_password(_self, credentials):
+            return _self.auth.sign_in_with_password(credentials)
+
+        return _sign_in_with_password(self, credentials)
 
     def get_bucket(
         self,
@@ -263,7 +307,9 @@ class SupabaseConnection(BaseConnection[Client]):
             "file_size_limit": file_size_limit,
             "allowed_mime_types": allowed_mime_types,
         }
-        response = self.client.storage._request("PUT", f"/bucket/{bucket_id}", json=json)
+        response = self.client.storage._request(
+            "PUT", f"/bucket/{bucket_id}", json=json
+        )
         return response.json()
 
     def move(self, bucket_id: str, from_path: str, to_path: str) -> "dict[str, str]":
@@ -312,7 +358,9 @@ class SupabaseConnection(BaseConnection[Client]):
         path: Optional[str] = None,
         limit: int = 100,
         offset: int = 0,
-        sortby: Optional[Literal["name", "updated_at", "created_at", "last_accessed_at"]] = "name",
+        sortby: Optional[
+            Literal["name", "updated_at", "created_at", "last_accessed_at"]
+        ] = "name",
         order: Optional[Literal["asc", "desc"]] = "asc",
         ttl: Optional[Union[float, timedelta, str]] = None,
     ) -> "list[dict[str, str]]":
@@ -482,7 +530,9 @@ class SupabaseConnection(BaseConnection[Client]):
 
 
 def execute_query(
-    query: Union[SyncSelectRequestBuilder, SyncQueryRequestBuilder, SyncFilterRequestBuilder],
+    query: Union[
+        SyncSelectRequestBuilder, SyncQueryRequestBuilder, SyncFilterRequestBuilder
+    ],
     ttl: Optional[Union[float, timedelta, str]] = None,
 ) -> APIResponse:
     """Execute the query.
