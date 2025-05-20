@@ -1034,16 +1034,9 @@ if st.session_state["initialized"]:
                 help="Password is encrypted",
             )
 
-            if "@" in identifier:
-                email = identifier
-                constructed_auth_query = (
-                    f"st_supabase.cached_sign_in_with_password(dict({email=}, {password=}))"
-                )
-            else:
-                phone = identifier
-                constructed_auth_query = (
-                    f"st_supabase.cached_sign_in_with_password(dict({phone=}, {password=}))"
-                )
+            identifier_field = "email" if "@" in identifier else "phone"
+            creds = {identifier_field: identifier, "password": password}
+            constructed_auth_query = f"st_supabase.cached_sign_in_with_password({creds})"
 
         elif auth_operation == "sign_in_with_otp":
             st.info(
@@ -1091,11 +1084,8 @@ st_supabase.auth.verify_otp(dict(type="magiclink", email=email, token=token))
 
                 if auth_operation == "sign_up":
                     auth_success_message = f"User created. Welcome {fname or ''} 🚀"
-                elif auth_operation in "sign_in_with_password":
-                    if "fname" in response.model_dump()["user"]["user_metadata"]:
-                        name = response.model_dump()["user"]["user_metadata"]["fname"]
-                    else:
-                        name = ""
+                elif auth_operation == "sign_in_with_password":
+                    name = response.model_dump()["user"]["user_metadata"].get("fname", "")
                     auth_success_message = f"""Logged in. Welcome {name}  🔓"""
                 elif auth_operation == "sign_out":
                     auth_success_message = "Signed out 🔒"
