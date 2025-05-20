@@ -4,8 +4,9 @@ import urllib
 from datetime import timedelta
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Literal, NotRequired, Optional, Tuple, TypedDict, Union
+from typing import Literal, Optional, Tuple, Union
 
+from gotrue.types import SignInWithPasswordCredentials
 from postgrest import (
     APIResponse,
     SyncFilterRequestBuilder,
@@ -16,30 +17,7 @@ from streamlit import cache_data, cache_resource
 from streamlit.connections import BaseConnection
 from supabase import Client, create_client
 
-__version__ = "2.0.1"
-
-
-class SignInWithPasswordCredentialsOptions(TypedDict):
-    data: NotRequired[Any]
-    captcha_token: NotRequired[str]
-
-
-class SignInWithEmailAndPasswordCredentials(TypedDict):
-    email: str
-    password: str
-    options: NotRequired[SignInWithPasswordCredentialsOptions]
-
-
-class SignInWithPhoneAndPasswordCredentials(TypedDict):
-    phone: str
-    password: str
-    options: NotRequired[SignInWithPasswordCredentialsOptions]
-
-
-SignInWithPasswordCredentials = Union[
-    SignInWithEmailAndPasswordCredentials,
-    SignInWithPhoneAndPasswordCredentials,
-]
+__version__ = "2.1.0"
 
 
 class SupabaseConnection(BaseConnection[Client]):
