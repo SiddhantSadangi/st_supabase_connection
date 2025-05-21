@@ -6,7 +6,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Literal, Optional, Tuple, Union
 
-from gotrue.types import SignInWithPasswordCredentials
+from gotrue.types import AuthResponse, SignInWithPasswordCredentials
 from postgrest import (
     APIResponse,
     SyncFilterRequestBuilder,
@@ -76,7 +76,7 @@ class SupabaseConnection(BaseConnection[Client]):
         self,
         credentials: SignInWithPasswordCredentials,
         ttl: Optional[Union[float, timedelta, str]] = None,
-    ) -> None:
+    ) -> AuthResponse:
         """Sign in with email and password or phone number and password, with caching enabled.
 
         Parameters
@@ -97,7 +97,7 @@ class SupabaseConnection(BaseConnection[Client]):
         self,
         bucket_id: str,
         ttl: Optional[Union[float, timedelta, str]] = None,
-    ):
+    ) -> dict[str, str]:
         """Retrieves the details of an existing storage bucket.
 
         Parameters
@@ -117,7 +117,7 @@ class SupabaseConnection(BaseConnection[Client]):
     def list_buckets(
         self,
         ttl: Optional[Union[float, timedelta, str]] = None,
-    ) -> list:
+    ) -> list[dict[str, str]]:
         """Retrieves the details of all storage buckets within an existing product.
 
         Parameters
