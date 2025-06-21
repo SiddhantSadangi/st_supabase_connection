@@ -47,7 +47,7 @@ with open("demo/sidebar.html", "r", encoding="UTF-8") as sidebar_file:
     sidebar_html = sidebar_file.read().replace("{VERSION}", VERSION)
 
 with st.sidebar:
-    with st.expander("💡**How to use**", expanded=True):
+    with st.expander("**How to use**", expanded=True, icon="💡"):
         st.info(
             """
                 1. Select a project and initialize client
@@ -65,7 +65,7 @@ with st.sidebar:
         st.cache_resource.clear()
         st.success("Cache cleared")
 
-    st_html(sidebar_html, height=247)
+    st_html(sidebar_html, height=290)
 
     st.html(
         """
@@ -618,12 +618,13 @@ if st.session_state["initialized"]:
             help = None
 
         if st.button(
-            "Run query 🏃",
+            "Run query",
             use_container_width=True,
             type="primary",
             disabled=st.session_state["storage_disabled"],
             help=help,
             key="run_storage_query",
+            icon="🚀",
         ):
             try:
                 if operation == "upload":
@@ -640,11 +641,12 @@ if st.session_state["initialized"]:
                         f"File **{file_name}** downloaded from Supabase to Streamlit hosted filesystem"
                     )
                     st.download_button(
-                        "Download to local filesystem ⏬",
+                        "Download to local filesystem",
                         data=data,
                         file_name=file_name,
                         mime=mime,
                         use_container_width=True,
+                        icon="⏬",
                     )
                 elif operation == "upload_to_signed_url":
                     response = st_supabase.upload_to_signed_url(
@@ -931,7 +933,7 @@ if st.session_state["initialized"]:
         )
 
         if rcol.button(
-            "Execute query 🏃",
+            "Execute query",
             use_container_width=True,
             type="primary",
             disabled=st.session_state["project"] == "demo"
@@ -943,6 +945,7 @@ if st.session_state["initialized"]:
                 else None
             ),
             key="run_db_query",
+            icon="🚀",
         ):
             try:
                 response = eval(constructed_db_query)
@@ -1083,14 +1086,18 @@ st_supabase.auth.verify_otp(dict(type="magiclink", email=email, token=token))
                 response = eval(constructed_auth_query)
 
                 if auth_operation == "sign_up":
-                    auth_success_message = f"User created. Welcome {fname or ''} 🚀"
+                    auth_success_message = f"User created. Welcome {fname or ''}"
+                    auth_success_icon = "🚀"
                 elif auth_operation == "sign_in_with_password":
                     name = response.model_dump()["user"]["user_metadata"].get("fname", "")
-                    auth_success_message = f"""Logged in. Welcome {name}  🔓"""
+                    auth_success_message = f"""Logged in. Welcome {name}"""
+                    auth_success_icon = "🔓"
                 elif auth_operation == "sign_out":
-                    auth_success_message = "Signed out 🔒"
+                    auth_success_message = "Signed out"
+                    auth_success_icon = "🔒"
                 elif auth_operation == "get_user":
                     auth_success_message = f"""{response.dict()["user"]["email"]} is logged in"""
+                    auth_success_icon = "🔓"
                 elif auth_operation == "get_session":
                     if response:
                         auth_success_message = (
@@ -1104,7 +1111,7 @@ st_supabase.auth.verify_otp(dict(type="magiclink", email=email, token=token))
                         )
 
                 if auth_success_message:
-                    st.success(auth_success_message)
+                    st.success(auth_success_message, icon=auth_success_icon)
 
                 if response is not None:
                     with st.expander("JSON response"):
