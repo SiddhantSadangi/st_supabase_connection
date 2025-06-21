@@ -6,7 +6,10 @@ from st_social_media_links import SocialMediaIcons
 from streamlit.components.v1 import html as st_html
 
 from st_supabase_connection import execute_query  # noqa: F401
-from st_supabase_connection import SupabaseConnection, __version__
+from st_supabase_connection import (
+    SupabaseConnection,
+    __version__,
+)
 
 VERSION = __version__
 
@@ -1023,7 +1026,7 @@ if st.session_state["initialized"]:
 
         elif auth_operation == "sign_in_with_password":
             lcol, rcol = st.columns(2)
-            email = lcol.text_input(label="Enter your email ID")
+            identifier = lcol.text_input(label="Enter your email ID or phone number")
             password = rcol.text_input(
                 label="Enter your password",
                 placeholder="Min 6 characters",
@@ -1031,9 +1034,9 @@ if st.session_state["initialized"]:
                 help="Password is encrypted",
             )
 
-            constructed_auth_query = (
-                f"st_supabase.auth.{auth_operation}(dict({email=}, {password=}))"
-            )
+            identifier_field = "email" if "@" in identifier else "phone"
+            creds = {identifier_field: identifier, "password": password}
+            constructed_auth_query = f"st_supabase.cached_sign_in_with_password({creds})"
 
         elif auth_operation == "sign_in_with_otp":
             st.info(
@@ -1081,8 +1084,9 @@ st_supabase.auth.verify_otp(dict(type="magiclink", email=email, token=token))
 
                 if auth_operation == "sign_up":
                     auth_success_message = f"User created. Welcome {fname or ''} 🚀"
-                elif auth_operation in "sign_in_with_password":
-                    auth_success_message = f"""Logged in. Welcome {response.dict()["user"]["user_metadata"]["fname"] or ''}  🔓"""
+                elif auth_operation == "sign_in_with_password":
+                    name = response.model_dump()["user"]["user_metadata"].get("fname", "")
+                    auth_success_message = f"""Logged in. Welcome {name}  🔓"""
                 elif auth_operation == "sign_out":
                     auth_success_message = "Signed out 🔒"
                 elif auth_operation == "get_user":
@@ -1104,7 +1108,7 @@ st_supabase.auth.verify_otp(dict(type="magiclink", email=email, token=token))
 
                 if response is not None:
                     with st.expander("JSON response"):
-                        st.write(response.dict())
+                        st.write(response.model_dump())
 
             except Exception as e:
                 if auth_operation == "get_user":

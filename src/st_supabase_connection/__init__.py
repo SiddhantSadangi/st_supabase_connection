@@ -17,7 +17,7 @@ from streamlit import cache_data, cache_resource
 from streamlit.connections import BaseConnection
 from supabase import Client, create_client
 
-__version__ = "2.0.1"
+__version__ = "2.1.0"
 
 
 class SupabaseConnection(BaseConnection[Client]):
@@ -97,7 +97,7 @@ class SupabaseConnection(BaseConnection[Client]):
         self,
         bucket_id: str,
         ttl: Optional[Union[float, timedelta, str]] = None,
-    ):
+    ) -> dict[str, str]:
         """Retrieves the details of an existing storage bucket.
 
         Parameters
@@ -117,7 +117,7 @@ class SupabaseConnection(BaseConnection[Client]):
     def list_buckets(
         self,
         ttl: Optional[Union[float, timedelta, str]] = None,
-    ) -> list:
+    ) -> list[dict[str, str]]:
         """Retrieves the details of all storage buckets within an existing product.
 
         Parameters
