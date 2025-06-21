@@ -6,6 +6,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Literal, Optional, Tuple, Union
 
+from gotrue.types import AuthResponse, SignInWithPasswordCredentials
 from postgrest import (
     APIResponse,
     SyncFilterRequestBuilder,
@@ -70,6 +71,27 @@ class SupabaseConnection(BaseConnection[Client]):
         self.auth = self.client.auth
         self.delete_bucket = self.client.storage.delete_bucket
         self.empty_bucket = self.client.storage.empty_bucket
+
+    def cached_sign_in_with_password(
+        self,
+        credentials: SignInWithPasswordCredentials,
+        ttl: Optional[Union[float, timedelta, str]] = None,
+    ) -> AuthResponse:
+        """Sign in with email and password or phone number and password, with caching enabled.
+
+        Parameters
+        ----------
+        credentials : SignInWithPasswordCredentials
+            The credentials to sign in with. This can be an email and password, or a phone number and password.
+        ttl : float, timedelta, str, or None
+            The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
+        """
+
+        @cache_resource(ttl=ttl)
+        def _sign_in_with_password(_self, credentials):
+            return _self.auth.sign_in_with_password(credentials)
+
+        return _sign_in_with_password(self, credentials)
 
     def get_bucket(
         self,
