@@ -1,7 +1,41 @@
 # :electric_plug: Streamlit Supabase Connector
-[![Downloads](https://static.pepy.tech/personalized-badge/st-supabase-connection?period=total&units=international_system&left_color=black&right_color=brightgreen&left_text=Downloads)](https://pepy.tech/project/st-supabase-connection)
+<div align="center">
+  <a href="https://pepy.tech/project/st-supabase-connection">
+    <img src="https://static.pepy.tech/personalized-badge/st-supabase-connection?period=total&units=international_system&left_color=black&right_color=brightgreen&left_text=Downloads" alt="Downloads">
+  </a>
+  <a href="https://badge.fury.io/py/st-supabase-connection">
+    <img src="https://badge.fury.io/py/st-supabase-connection.svg" alt="PyPI version">
+  </a>
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
+  </a>
+  <a href="https://github.com/SiddhantSadangi/st_supabase_connection/issues">
+    <img src="https://img.shields.io/github/issues/SiddhantSadangi/st_supabase_connection.svg" alt="Issues">
+  </a>
+  <a href="https://github.com/SiddhantSadangi/st_supabase_connection/pulls">
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome">
+  </a>
+</div>
 
 A Streamlit connection component to connect Streamlit to Supabase Storage, Database, and Auth.
+
+## 🚀 Quickstart
+
+```python
+import streamlit as st
+from st_supabase_connection import SupabaseConnection
+
+st_supabase_client = st.connection(
+    name="supabase_connection",
+    type=SupabaseConnection,
+    url=<your-supabase-url>,
+    key=<your-supabase-key>
+)
+
+# Example: List buckets
+buckets = st_supabase_client.list_buckets()
+st.write(buckets)
+```
 
 ## :student: Interactive tutorial
 <div align="center">
@@ -207,7 +241,8 @@ pip install st-supabase-connection
 <details>
 <summary> Auth </summary>
 <ul>
-    All methods supported by <a href="https://supabase.com/docs/reference/python/auth-signup">Supabase's Python API </a>.
+    <li> <code>cached_sign_in_with_password()</code> - Cached version of <code>sign_in_with_password()</code> for faster sign-in. </li>
+    <li> All methods supported by <a href="https://supabase.com/docs/reference/python/auth-signup">Supabase's Python API </a>.
 </details>
 
 ## :books: Examples
@@ -510,23 +545,25 @@ st_supabase_client.auth.sign_up(
 ```
 
 #### Sign in with password
+`SupabaseConnection()` offers a cached version of `sign_in_with_password()` for faster, request-free sign-ins.
+
 ```python
-st_supabase_client.auth.sign_in_with_password(dict(email='test.user@abc.com', password='***'))
+st_supabase_client.cached_sign_in_with_password(dict(email='test.user@abc.com', password='***'))
 ```
 
 #### Retrieve session
 ```python
-st_supabase.auth.get_session()
+st_supabase_client.auth.get_session()
 ```
 
 #### Retrieve user
 ```python
-st_supabase.auth.get_user()
+st_supabase_client.auth.get_user()
 ```
 
 #### Sign out
 ```python
-st_supabase.auth.sign_out()
+st_supabase_client.auth.sign_out()
 ```
 
 > [!NOTE]  
@@ -538,8 +575,18 @@ st_supabase.auth.sign_out()
 ## :bow: Acknowledgements
 This connector builds upon the awesome work done by the open-source community in general and the [Supabase Community](https://github.com/supabase-community) in particular. I cannot be more thankful to all the authors whose work I have used either directly or indirectly.
 
+Thanks to all contributors to this project :bow:
+
+<p align="center">
+    <a href="https://github.com/SiddhantSadangi/st_supabase_connection/graphs/contributors">
+        <img src="https://contrib.rocks/image?repo=SiddhantSadangi/st_supabase_connection" alt="Contributors" style="height: 60px !important;width: 217px !important;">
+    </a>
+</p>
+
 ## :hugs: Want to support my work?
 <p align="center">
-    <a href="https://www.buymeacoffee.com/siddhantsadangi" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;">
+    <a href="https://www.buymeacoffee.com/siddhantsadangi" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;">
     </a>
+    <br>
+    <a href="https://github.com/sponsors/SiddhantSadangi" target="_blank"><img src="https://img.shields.io/badge/Sponsor%20me%20on-GitHub-f34b7d?logo=github&style=flat" alt="Sponsor me on GitHub" style="height: 28px !important;">
 </p>
