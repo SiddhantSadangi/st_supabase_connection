@@ -65,7 +65,7 @@ with st.sidebar:
         st.cache_resource.clear()
         st.success("Cache cleared")
 
-    st_html(sidebar_html, height=325)
+    st_html(sidebar_html, height=320)
 
     st.html(
         """
