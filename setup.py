@@ -46,6 +46,6 @@ setuptools.setup(
         "Topic :: Software Development :: User Interfaces",
     ],
     keywords=["streamlit", "supabase", "connection", "integration"],
-    python_requires=">=3.8",
-    install_requires=["streamlit>=1.28", "supabase"],
+    python_requires=">=3.10",
+    install_requires=["streamlit>=1.28", "supabase>=2.18.1"],
 )

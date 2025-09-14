@@ -6,7 +6,6 @@ from io import BytesIO
 from pathlib import Path
 from typing import Literal, Optional, Tuple, Union
 
-from gotrue.types import AuthResponse, SignInWithPasswordCredentials
 from postgrest import (
     APIResponse,
     SyncFilterRequestBuilder,
@@ -16,8 +15,9 @@ from postgrest import (
 from streamlit import cache_data, cache_resource
 from streamlit.connections import BaseConnection
 from supabase import Client, create_client
+from supabase_auth.types import AuthResponse, SignInWithPasswordCredentials
 
-__version__ = "2.1.0"
+__version__ = "2.1.1"
 
 
 class SupabaseConnection(BaseConnection[Client]):
