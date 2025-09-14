@@ -1096,12 +1096,14 @@ st_supabase.auth.verify_otp(dict(type="magiclink", email=email, token=token))
                     auth_success_message = "Signed out"
                     auth_success_icon = "🔒"
                 elif auth_operation == "get_user":
-                    auth_success_message = f"""{response.dict()["user"]["email"]} is logged in"""
+                    auth_success_message = (
+                        f"""{response.model_dump()["user"]["email"]} is logged in"""
+                    )
                     auth_success_icon = "🔓"
                 elif auth_operation == "get_session":
                     if response:
                         auth_success_message = (
-                            (f"""{response.dict()["user"]["email"]} is logged in""")
+                            (f"""{response.model_dump()["user"]["email"]} is logged in""")
                             if response
                             else None
                         )
