@@ -76,6 +76,7 @@ def custom_exception_handler(exception: Exception) -> None:
                 secrets["email"]["recipient_email"],
                 text,
             )
-    except Exception:
+    except Exception as e:
+        print(f"Error sending email: {e}")
         return False
     return True

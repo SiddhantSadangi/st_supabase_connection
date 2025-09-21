@@ -66,7 +66,6 @@ with st.sidebar:
         "Clear cache to fetch latest data🧹",
         use_container_width=True,
     ):
-        raise Exception("Test exception")
         st.cache_data.clear()
         st.cache_resource.clear()
         st.success("Cache cleared")
