@@ -4,6 +4,8 @@ import pandas as pd
 import streamlit as st
 from st_social_media_links import SocialMediaIcons
 from streamlit.components.v1 import html as st_html
+from streamlit_extras.exception_handler import set_global_exception_handler
+from utils import custom_exception_handler
 
 from st_supabase_connection import execute_query  # noqa: F401
 from st_supabase_connection import (
@@ -23,6 +25,9 @@ st.set_page_config(
         "Get help": None,
     },
 )
+
+
+set_global_exception_handler(custom_exception_handler)
 
 # ---------- INIT SESSION ----------
 upsert = operators = bucket_id = file_size_limit = allowed_mime_types = source = None

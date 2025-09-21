@@ -1,2 +1,3 @@
 st-social-media-links
 st_supabase_connection
+streamlit_extras
