@@ -1,4 +1,5 @@
 # :electric_plug: Streamlit Supabase Connector
+
 <div align="center">
   <a href="https://pepy.tech/project/st-supabase-connection">
     <img src="https://static.pepy.tech/personalized-badge/st-supabase-connection?period=total&units=international_system&left_color=black&right_color=brightgreen&left_text=Downloads" alt="Downloads">
@@ -38,6 +39,7 @@ st.write(buckets)
 ```
 
 ## :student: Interactive tutorial
+
 <div align="center">
     <a href="https://st-supabase-connection.streamlit.app/">
         <img src="https://static.streamlit.io/badges/streamlit_badge_black_white.svg" alt="Open in Streamlit" style="height: 60px !important;width: 217px !important;">
@@ -46,12 +48,12 @@ st.write(buckets)
 
 ![Web capture_2-12-2023_124639_st-supabase-connection streamlit app](https://github.com/SiddhantSadangi/st_supabase_connection/assets/41324509/2870b021-48a0-4143-9693-c840880a28be)
 
-
 ## :thinking: Why use this?
-- [X] Cache functionality to cache returned results. **Save time and money** on your API requests
-- [X] Same method names as the Supabase Python API. **Minimum relearning required**
-- [X] **Exposes more storage methods** than currently supported by the Supabase Python API. For example, `update()`, `create_signed_upload_url()`, and `upload_to_signed_url()`
-- [X] **Less keystrokes required** when integrating with your Streamlit app.
+
+- [x] Cache functionality to cache returned results. **Save time and money** on your API requests
+- [x] Same method names as the Supabase Python API. **Minimum relearning required**
+- [x] **Exposes more storage methods** than currently supported by the Supabase Python API. For example, `update()`, `create_signed_upload_url()`, and `upload_to_signed_url()`
+- [x] **Less keystrokes required** when integrating with your Streamlit app.
 
 <details close>
 <summary>Examples with and without the connector </summary>
@@ -89,7 +91,7 @@ if st.button("Request download"):
     data = open(file_name, "rb")
 
     st.download_button(
-        "Download file", data=data, 
+        "Download file", data=data,
         file_name=file_name, mime=mime,
     )
 ```
@@ -114,7 +116,7 @@ if st.button("Request download"):
     )
 
     st.download_button(
-        "Download file", data=data, 
+        "Download file", data=data,
         file_name=file_name, mime=mime,
     )
 
@@ -137,7 +139,7 @@ supabase_key="...", supabase_url="..."
 bucket_id = st.text_input("Enter the bucket_id")
 uploaded_file = st.file_uploader("Choose a file")
 destination_path = st.text_input("Enter destination path")
-overwrite = "true" if st.checkbox("Overwrite?") else "false"  
+overwrite = "true" if st.checkbox("Overwrite?") else "false"
 
 with open(uploaded_file.name, "wb") as f:
     f.write(uploaded_file.getbuffer())
@@ -153,7 +155,7 @@ if st.button("Upload"):
             },
         )
 
-``` 
+```
 
 </td>
 <td valign="top">
@@ -169,14 +171,15 @@ st_supabase_client = st.connection(
 bucket_id = st.text_input("Enter the bucket_id")
 uploaded_file = st.file_uploader("Choose a file"):
 destination_path = st.text_input("Enter destination path")
-overwrite = "true" if st.checkbox("Overwrite?") else "false" 
+overwrite = "true" if st.checkbox("Overwrite?") else "false"
 
 if st.button("Upload"):
     st_supabase_client.upload(
-        bucket_id, "local", uploaded_file, 
+        bucket_id, "local", uploaded_file,
         destination_path, overwrite,
     )
 ```
+
 <tr>
 </table>
 
@@ -185,9 +188,11 @@ if st.button("Upload"):
 ## :hammer_and_wrench: Setup
 
 1. Install `st-supabase-connection`
+
 ```sh
 pip install st-supabase-connection
 ```
+
 2. Set the `SUPABASE_URL` and `SUPABASE_KEY` Streamlit secrets as described [here](https://docs.streamlit.io/streamlit-community-cloud/get-started/deploy-an-app/connect-to-data-sources/secrets-management).
 
 > [!NOTE]  
@@ -196,20 +201,25 @@ pip install st-supabase-connection
 ## :magic_wand: Usage
 
 1. Import
-  ```python
-  from st_supabase_connection import SupabaseConnection, execute_query
-  ```
+
+```python
+from st_supabase_connection import SupabaseConnection, execute_query
+```
+
 2. Initialize
-  ```python
-  st_supabase_client = st.connection(
-      name="YOUR_CONNECTION_NAME",
-      type=SupabaseConnection,
-      ttl=None,
-  )
-  ```
+
+```python
+st_supabase_client = st.connection(
+    name="YOUR_CONNECTION_NAME",
+    type=SupabaseConnection,
+    ttl=None,
+)
+```
+
 3. Use in your app to query tables and files, and add authentication. Happy Streamlit-ing! :balloon:
 
 ## :ok_hand: Supported methods
+
 <details close>
 <summary> Storage </summary>
 <ul>
@@ -227,7 +237,7 @@ pip install st-supabase-connection
     <li> <code>get_public_url()</code> </li>
     <li> <code>create_signed_upload_url()</code> </li>
     <li> <code>upload_to_signed_url()</code> </li>
-</ul> 
+</ul>
 
 </details>
 
@@ -246,9 +256,11 @@ pip install st-supabase-connection
 </details>
 
 ## :books: Examples
+
 ### :package: Storage operations
 
 #### List existing buckets
+
 ```python
 >>> st_supabase_client.list_buckets(ttl=None)
 [
@@ -274,18 +286,23 @@ pip install st-supabase-connection
     ),
 ]
 ```
+
 #### Create a bucket
+
 ```python
 >>> st_supabase_client.create_bucket("new_bucket")
 {'name': 'new_bucket'}
 ```
 
 #### Get bucket details
+
 ```python
 >>> st_supabase_client.get_bucket("new_bucket")
 SyncBucket(id='new_bucket', name='new_bucket', owner='', public=True, created_at=datetime.datetime(2023, 8, 2, 19, 41, 44, 810000, tzinfo=tzutc()), updated_at=datetime.datetime(2023, 8, 2, 19, 41, 44, 810000, tzinfo=tzutc()), file_size_limit=None, allowed_mime_types=None)
 ```
+
 #### Update a bucket
+
 ```python
 >>> st_supabase_client.update_bucket(
       "new_bucket",
@@ -297,12 +314,14 @@ SyncBucket(id='new_bucket', name='new_bucket', owner='', public=True, created_at
 ```
 
 #### Move files in a bucket
+
 ```python
 >>> st_supabase_client.move("new_bucket", "test.png", "folder1/new_test.png")
 {'message': 'Successfully moved'}
 ```
 
 #### List objects in a bucket
+
 ```python
 >>> st_supabase_client.list_objects("new_bucket", path="folder1", ttl=0)
 [
@@ -326,17 +345,23 @@ SyncBucket(id='new_bucket', name='new_bucket', owner='', public=True, created_at
 ```
 
 #### Empty a bucket
+
 ```python
 >>> st_supabase_client.empty_bucket("new_bucket")
 {'message': 'Successfully emptied'}
 ```
+
 #### Delete a bucket
+
 ```python
 >>> st_supabase_client.delete_bucket("new_bucket")
 {'message': 'Successfully deleted'}
 ```
+
 ### :file_cabinet: Database operations
-#### Simple query 
+
+#### Simple query
+
 ```python
 >>> execute_query(st_supabase_client.table("countries").select("*"), ttl=0)
 APIResponse(
@@ -348,13 +373,15 @@ APIResponse(
     count=None,
 )
 ```
+
 #### Query with join
+
 ```python
 >>> execute_query(
-        st_supabase_client.table("users").select("name, teams(name)", count="exact"), 
+        st_supabase_client.table("users").select("name, teams(name)", count="exact"),
         ttl="1h",
     )
-    
+
 APIResponse(
     data=[
         {"name": "Kiran", "teams": [{"name": "Green"}, {"name": "Blue"}]},
@@ -363,7 +390,9 @@ APIResponse(
     count=2,
 )
 ```
+
 #### Filter through foreign tables
+
 ```python
 >>> execute_query(
         st_supabase_client.table("cities").select("name, countries(*)", count="exact").eq("countries.name", "Curaçao"),
@@ -390,6 +419,7 @@ APIResponse(
 ```
 
 #### Insert rows
+
 ```python
 >>> execute_query(
         st_supabase_client.table("countries").insert(
@@ -397,7 +427,7 @@ APIResponse(
         ),
         ttl=0,
     )
-    
+
 APIResponse(
     data=[
         {
@@ -421,19 +451,18 @@ APIResponse(
 )
 ```
 
-###  :lock: Auth operations
+### :lock: Auth operations
 
 > [!NOTE]  
 > If the call is valid, all Supabase Auth methods return the same response structure:
+>
 > ```json
 > {
 >   "user": {
 >     "id": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544",
 >     "app_metadata": {
 >       "provider": "email",
->       "providers": [
->         "email"
->       ]
+>       "providers": ["email"]
 >     },
 >     "user_metadata": {
 >       "attribution": "I made it :)",
@@ -483,9 +512,7 @@ APIResponse(
 >       "id": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544",
 >       "app_metadata": {
 >         "provider": "email",
->         "providers": [
->           "email"
->         ]
+>         "providers": ["email"]
 >       },
 >       "user_metadata": {
 >         "attribution": "I made it :)",
@@ -526,9 +553,11 @@ APIResponse(
 >   }
 > }
 > ```
+>
 > </details>
 
 #### Create new user
+
 ```python
 st_supabase_client.auth.sign_up(
     dict(
@@ -545,6 +574,7 @@ st_supabase_client.auth.sign_up(
 ```
 
 #### Sign in with password
+
 `SupabaseConnection()` offers a cached version of `sign_in_with_password()` for faster, request-free sign-ins.
 
 ```python
@@ -552,16 +582,19 @@ st_supabase_client.cached_sign_in_with_password(dict(email='test.user@abc.com', 
 ```
 
 #### Retrieve session
+
 ```python
 st_supabase_client.auth.get_session()
 ```
 
 #### Retrieve user
+
 ```python
 st_supabase_client.auth.get_user()
 ```
 
 #### Sign out
+
 ```python
 st_supabase_client.auth.sign_out()
 ```
@@ -570,9 +603,11 @@ st_supabase_client.auth.sign_out()
 > Check the [Supabase Python API reference](https://supabase.com/docs/reference/python/select) for more examples.
 
 ## :star: Explore all options in a demo app
+
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-supabase-connection.streamlit.app/)
 
 ## :bow: Acknowledgements
+
 This connector builds upon the awesome work done by the open-source community in general and the [Supabase Community](https://github.com/supabase-community) in particular. I cannot be more thankful to all the authors whose work I have used either directly or indirectly.
 
 Thanks to all contributors to this project :bow:
@@ -584,6 +619,7 @@ Thanks to all contributors to this project :bow:
 </p>
 
 ## :hugs: Want to support my work?
+
 <p align="center">
     <a href="https://www.buymeacoffee.com/siddhantsadangi" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;">
     </a>
