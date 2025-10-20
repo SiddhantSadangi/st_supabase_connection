@@ -64,7 +64,7 @@ with st.sidebar:
 
     if st.button(
         "Clear cache to fetch latest data🧹",
-        use_container_width=True,
+        width="stretch",
     ):
         st.cache_data.clear()
         st.cache_resource.clear()
@@ -132,7 +132,7 @@ with st.expander("**Select project**", expanded=not st.session_state["initialize
         if st.button(
             "Initialize client ⚡",
             type="primary",
-            use_container_width=True,
+            width="stretch",
         ):
             try:
                 st.session_state["client"] = st.connection(
@@ -174,7 +174,7 @@ with st.expander("**Select project**", expanded=not st.session_state["initialize
             if st.form_submit_button(
                 "Initialize client ⚡",
                 type="primary",
-                use_container_width=True,
+                width="stretch",
             ):
                 try:
                     st.session_state["client"] = st.connection(
@@ -624,7 +624,7 @@ if st.session_state["initialized"]:
 
         if st.button(
             "Run query",
-            use_container_width=True,
+            width="stretch",
             type="primary",
             disabled=st.session_state["storage_disabled"],
             help=help,
@@ -650,7 +650,7 @@ if st.session_state["initialized"]:
                         data=data,
                         file_name=file_name,
                         mime=mime,
-                        use_container_width=True,
+                        width="stretch",
                         icon="⏬",
                     )
                 elif operation == "upload_to_signed_url":
@@ -707,7 +707,7 @@ if st.session_state["initialized"]:
                     elif operation == "list_objects":
                         st.info(f"Listing **{len(response)}** objects")
                         _df = pd.DataFrame.from_dict(response)
-                        st.dataframe(_df, use_container_width=True)
+                        st.dataframe(_df, width="stretch")
                     elif operation == "get_public_url":
                         st.success(response, icon="🔗")
                     elif operation == "create_signed_urls":
@@ -939,7 +939,7 @@ if st.session_state["initialized"]:
 
         if rcol.button(
             "Execute query",
-            use_container_width=True,
+            width="stretch",
             type="primary",
             disabled=st.session_state["project"] == "demo"
             and request_builder in ["insert", "upsert", "update", "delete"],
@@ -960,7 +960,7 @@ if st.session_state["initialized"]:
                         f"**{response.count}** rows {request_builder}ed. `count` does not take `limit` into account."
                     )
                 if view == "Dataframe":
-                    st.dataframe(response.data, use_container_width=True)
+                    st.dataframe(response.data, width="stretch")
                 else:
                     st.write(response.data)
             except ValueError:
@@ -1082,7 +1082,7 @@ st_supabase.auth.verify_otp(dict(type="magiclink", email=email, token=token))
 
         if st.button(
             "Execute 🪄",
-            use_container_width=True,
+            width="stretch",
             type="primary",
             key="run_auth_query",
             disabled=not constructed_auth_query,

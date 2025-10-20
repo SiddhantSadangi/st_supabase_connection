@@ -17,7 +17,7 @@ from streamlit.connections import BaseConnection
 from supabase import Client, create_client
 from supabase_auth.types import AuthResponse, SignInWithPasswordCredentials
 
-__version__ = "2.1.1"
+__version__ = "2.1.2"
 
 
 class SupabaseConnection(BaseConnection[Client]):
@@ -522,7 +522,7 @@ def execute_query(
     """
 
     def _hash_func(x):
-        return hash(x.path + str(x.params))
+        return hash(str(x.request.path) + str(x.request.params) + str(x.request.json or {}))
 
     @cache_resource(
         ttl=ttl,
