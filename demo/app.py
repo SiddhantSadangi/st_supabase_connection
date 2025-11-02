@@ -1,4 +1,5 @@
 import contextlib
+from typing import Any
 
 import pandas as pd
 import streamlit as st
@@ -28,6 +29,29 @@ st.set_page_config(
 
 
 set_global_exception_handler(custom_exception_handler)
+
+
+class CodeLiteral(str):
+    """Marker to indicate a pre-rendered snippet that should not be repr()-ed."""
+
+
+def literal(value: str) -> CodeLiteral:
+    return CodeLiteral(value)
+
+
+def construct_storage_call(operation: str, /, *args: Any, **kwargs: Any) -> str:
+    parts: list[str] = []
+    for value in args:
+        rendered = value if isinstance(value, CodeLiteral) else repr(value)
+        parts.append(rendered)
+    for key, value in kwargs.items():
+        rendered = value if isinstance(value, CodeLiteral) else repr(value)
+        parts.append(f"{key}={rendered}")
+    if not parts:
+        return f"st_supabase.{operation}()"
+    joined = ",\n    ".join(parts)
+    return f"st_supabase.{operation}(\n    {joined},\n)"
+
 
 # ---------- INIT SESSION ----------
 upsert = operators = bucket_id = file_size_limit = allowed_mime_types = source = None
@@ -306,11 +330,11 @@ if st.session_state["initialized"]:
                 help="Leave blank to cache indefinitely",
             )
             ttl = None if ttl == "" else ttl
-            constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}", {ttl=})"""
+            constructed_storage_query = construct_storage_call(operation, bucket_id, ttl=ttl)
             st.session_state["storage_disabled"] = bool(not bucket_id)
 
         elif operation in ["delete_bucket", "empty_bucket"]:
-            constructed_storage_query = f"""st_supabase.{operation}("{bucket_id}")"""
+            constructed_storage_query = construct_storage_call(operation, bucket_id)
             st.session_state["storage_disabled"] = bool(not bucket_id)
 
         elif operation == "create_bucket":
@@ -343,7 +367,17 @@ if st.session_state["initialized"]:
                 value=False,
             )
 
-            constructed_storage_query = f"""st_supabase.create_bucket('{bucket_id}',{name=},{file_size_limit=},allowed_mime_types={allowed_mime_types},{public=})"""
+            allowed_literal = literal(
+                allowed_mime_types if allowed_mime_types is not None else "None"
+            )
+            constructed_storage_query = construct_storage_call(
+                operation,
+                bucket_id,
+                name=name,
+                file_size_limit=file_size_limit,
+                allowed_mime_types=allowed_literal,
+                public=public,
+            )
             st.session_state["storage_disabled"] = bool(not bucket_id)
 
         elif operation == "update_bucket":
@@ -380,7 +414,16 @@ if st.session_state["initialized"]:
                         st.write(e)
                     st.session_state["storage_disabled"] = True
 
-            constructed_storage_query = f"""st_supabase.{operation}('{bucket_id}',{file_size_limit=},allowed_mime_types={allowed_mime_types},{public=})"""
+            allowed_literal = literal(
+                allowed_mime_types if allowed_mime_types is not None else "None"
+            )
+            constructed_storage_query = construct_storage_call(
+                operation,
+                bucket_id,
+                file_size_limit=file_size_limit,
+                allowed_mime_types=allowed_literal,
+                public=public,
+            )
 
         elif operation == "upload":
             destination_path = None
@@ -401,17 +444,16 @@ if st.session_state["initialized"]:
                 )
                 overwrite = "true" if rcol.checkbox("Overwrite if exists?") else "false"
 
-                constructed_storage_query = (
-                    f"""
-st_supabase.{operation}(
-    "{bucket_id}", 
-    {source=}, 
-    file={file}, 
-    destination_path="{destination_path}", 
-    {overwrite=},
-)
-# `UploadedFile` is the `BytesIO` object returned by `st.file_uploader()`
-""",
+                constructed_storage_query = construct_storage_call(
+                    operation,
+                    bucket_id,
+                    source=source,
+                    file=literal("file"),
+                    destination_path=destination_path,
+                    overwrite=overwrite,
+                )
+                constructed_storage_query += (
+                    "\n# `UploadedFile` is the `BytesIO` object returned by `st.file_uploader()`"
                 )
             else:
                 file = rcol.text_input(
@@ -425,15 +467,14 @@ st_supabase.{operation}(
                     value=file,
                 )
                 overwrite = "true" if rcol.checkbox("Overwrite if exists?") else "false"
-                constructed_storage_query = f"""
-st_supabase.{operation}(
-    "{bucket_id}", 
-    {source=}, 
-    {file=}, 
-    destination_path="{destination_path}", 
-    {overwrite=},
-)
-"""
+                constructed_storage_query = construct_storage_call(
+                    operation,
+                    bucket_id,
+                    source=source,
+                    file=file,
+                    destination_path=destination_path,
+                    overwrite=overwrite,
+                )
             st.session_state["storage_disabled"] = bool(not all([bucket_id, file]))
         elif operation == "list_buckets":
             ttl = st.text_input(
@@ -443,7 +484,7 @@ st_supabase.{operation}(
                 help="Leave blank to cache indefinitely",
             )
             ttl = None if ttl == "" else ttl
-            constructed_storage_query = f"""st_supabase.{operation}({ttl=})"""
+            constructed_storage_query = construct_storage_call(operation, ttl=ttl)
             st.session_state["storage_disabled"] = False
 
         elif operation == "download":
@@ -460,13 +501,12 @@ st_supabase.{operation}(
             )
             ttl = None if ttl == "" else ttl
 
-            constructed_storage_query = f"""
-st_supabase.{operation}(
-    "{bucket_id}", 
-    {source_path=}, 
-    {ttl=},
-)
-"""
+            constructed_storage_query = construct_storage_call(
+                operation,
+                bucket_id,
+                source_path=source_path,
+                ttl=ttl,
+            )
             st.session_state["storage_disabled"] = bool(not all([bucket_id, source_path]))
 
         elif operation == "move":
@@ -479,13 +519,12 @@ st_supabase.{operation}(
                 placeholder="/folder/subFolder/file.txt",
                 help="Path will be created if it does not exist",
             )
-            constructed_storage_query = f"""
-st_supabase.{operation}(
-    "{bucket_id}", 
-    {from_path=}, 
-    {to_path=},
-)
-"""
+            constructed_storage_query = construct_storage_call(
+                operation,
+                bucket_id,
+                from_path=from_path,
+                to_path=to_path,
+            )
 
             st.session_state["storage_disabled"] = bool(not all([bucket_id, from_path, to_path]))
         elif operation == "remove":
@@ -494,12 +533,11 @@ st_supabase.{operation}(
                 placeholder="""["image.png","/folder/subFolder/file.txt"]""",
                 help="Enter as a list",
             )
-            constructed_storage_query = f"""
-st_supabase.{operation}(
-    "{bucket_id}", 
-    paths={paths},
-)
-"""
+            constructed_storage_query = construct_storage_call(
+                operation,
+                bucket_id,
+                paths=literal(paths),
+            )
 
             st.session_state["storage_disabled"] = bool(not all([bucket_id, paths]))
         elif operation == "list_objects":
@@ -543,17 +581,16 @@ st_supabase.{operation}(
                 horizontal=True,
             )
 
-            constructed_storage_query = f"""
-st_supabase.{operation}(
-    "{bucket_id}", 
-    {path=}, 
-    {limit=}, 
-    {offset=}, 
-    {sortby=}, 
-    {order=}, 
-    {ttl=},
-)
-"""
+            constructed_storage_query = construct_storage_call(
+                operation,
+                bucket_id,
+                path=path,
+                limit=limit,
+                offset=offset,
+                sortby=sortby,
+                order=order,
+                ttl=ttl,
+            )
 
             st.session_state["storage_disabled"] = not bool(bucket_id)
 
@@ -571,13 +608,12 @@ st_supabase.{operation}(
             )
             ttl = None if ttl == "" else ttl
 
-            constructed_storage_query = f"""
-st_supabase.get_public_url(
-    "{bucket_id}",
-    {filepath=},
-    {ttl=},
-)
-"""
+            constructed_storage_query = construct_storage_call(
+                operation,
+                bucket_id,
+                filepath=filepath,
+                ttl=ttl,
+            )
 
             st.session_state["storage_disabled"] = bool(not all([bucket_id, filepath]))
 
@@ -594,13 +630,12 @@ st_supabase.get_public_url(
                 value=3600,
             )
 
-            constructed_storage_query = f"""
-st_supabase.create_signed_urls(
-    "{bucket_id}",
-    paths={paths},
-    {expires_in=},
-)
-"""
+            constructed_storage_query = construct_storage_call(
+                operation,
+                bucket_id,
+                paths=literal(paths),
+                expires_in=expires_in,
+            )
             st.session_state["storage_disabled"] = bool(not all([bucket_id, paths, expires_in]))
 
         elif operation == "create_signed_upload_url":
@@ -608,12 +643,11 @@ st_supabase.create_signed_urls(
                 "Enter the file path",
                 placeholder="/folder/subFolder/image.jpg",
             )
-            constructed_storage_query = f"""
-st_supabase.create_signed_upload_url(
-    "{bucket_id}",
-    {path=},
-)
-"""
+            constructed_storage_query = construct_storage_call(
+                operation,
+                bucket_id,
+                path=path,
+            )
             st.session_state["storage_disabled"] = bool(not all([bucket_id, path]))
 
         elif operation == "upload_to_signed_url":
@@ -633,38 +667,34 @@ st_supabase.create_signed_upload_url(
                 options=["local", "hosted"],
                 help="Filesystem from where the file has to be uploaded",
             )
-            overwrite = "false"
             if source == "local":
                 file = rcol.file_uploader("Choose a file")
 
-                constructed_storage_query = f"""
-st_supabase.{operation}(
-        "{bucket_id}", 
-        {source=}, 
-        {path=}, 
-        token="***", 
-        file={file}, 
-        {overwrite=},
-)
-# `UploadedFile` is the `BytesIO` object returned by `st.file_uploader()`
-"""
-            elif source == "hosted":
+                constructed_storage_query = construct_storage_call(
+                    operation,
+                    bucket_id,
+                    path=path,
+                    token=literal('"***"'),
+                    file=literal("file"),
+                )
+                constructed_storage_query += (
+                    "\n# `UploadedFile` is the `BytesIO` object returned by `st.file_uploader()`"
+                )
+            else:
                 file = rcol.text_input(
                     "Source path",
                     placeholder="path/to/file.txt",
                     help="This is the path of the file on the Streamlit hosted filesystem",
                 )
-                constructed_storage_query = f"""
-st_supabase.{operation}(
-    "{bucket_id}", 
-    {source=}, 
-    {path=}, 
-    token="***", 
-    {file=}, 
-    {overwrite=},
-)
-"""
-            st.session_state["storage_disabled"] = bool(not all([bucket_id, token, path]))
+                constructed_storage_query = construct_storage_call(
+                    operation,
+                    bucket_id,
+                    path=path,
+                    token=literal('"***"'),
+                    file=file,
+                )
+            required_inputs = [bucket_id, token, path, file]
+            st.session_state["storage_disabled"] = bool(not all(required_inputs))
 
         st.write("**Constructed code**")
         if operation == "download":
@@ -719,7 +749,6 @@ st_supabase.{operation}(
                 elif operation == "upload_to_signed_url":
                     response = st_supabase.upload_to_signed_url(
                         bucket_id,
-                        source,
                         path,
                         token,
                         file,

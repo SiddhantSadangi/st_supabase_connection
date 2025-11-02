@@ -1,10 +1,9 @@
 import mimetypes
 import os
-import urllib
 from datetime import timedelta
 from io import BytesIO
 from pathlib import Path
-from typing import Literal, Optional, Tuple, Union
+from typing import IO, Callable, Iterable, Literal, Optional, Tuple, Union
 
 from postgrest import (
     APIResponse,
@@ -18,6 +17,69 @@ from supabase import Client, create_client
 from supabase_auth.types import AuthResponse, SignInWithPasswordCredentials
 
 __version__ = "2.1.3"
+
+_DEFAULT_MIME_TYPE = "application/octet-stream"
+
+
+def _normalize_storage_path(path: str) -> str:
+    sanitized_path = path.lstrip("/")
+    if not sanitized_path:
+        raise ValueError("Object paths must not be empty or point to the bucket root.")
+    return sanitized_path
+
+
+def _normalize_storage_paths(paths: Iterable[str]) -> list[str]:
+    return [_normalize_storage_path(item) for item in paths]
+
+
+def _prepare_upload_payload(
+    file: Union[str, Path, BytesIO, bytes, IO[bytes]],
+    fallback_name: str,
+) -> tuple[Union[bytes, IO[bytes]], str, Optional[Callable[[], None]]]:
+    """
+    Prepare payload and content-type for uploading to storage.
+
+    Returns
+    -------
+    payload : bytes | IO[bytes]
+        The object that should be sent to storage3.
+    content_type : str
+        MIME type inferred from the file or fallback name.
+    cleanup : Callable | None
+        Callable to invoke after upload (used to close opened file handles).
+    """
+    if isinstance(file, (str, Path)):
+        file_path = Path(file)
+        file_obj = open(file_path, "rb")
+        content_type = mimetypes.guess_type(str(file_path))[0] or _DEFAULT_MIME_TYPE
+        return file_obj, content_type, file_obj.close
+
+    # file-like object or raw bytes
+    name_hint = getattr(file, "name", fallback_name)
+    content_type = (
+        getattr(file, "type", None)
+        or getattr(file, "content_type", None)
+        or mimetypes.guess_type(name_hint)[0]
+        or _DEFAULT_MIME_TYPE
+    )
+
+    if isinstance(file, bytes):
+        return file, content_type, None
+
+    if hasattr(file, "seek"):
+        file.seek(0)
+
+    if hasattr(file, "getvalue"):
+        payload: Union[bytes, IO[bytes]] = file.getvalue()  # type: ignore[assignment]
+    elif hasattr(file, "read"):
+        payload = file.read()  # type: ignore[assignment]
+    else:
+        payload = file  # type: ignore[assignment]
+
+    if isinstance(payload, str):
+        payload = payload.encode()
+
+    return payload, content_type, None
 
 
 class SupabaseConnection(BaseConnection[Client]):
@@ -382,13 +444,7 @@ class SupabaseConnection(BaseConnection[Client]):
         expires_in : int
             Number of seconds until the signed URL expires.
         """
-        normalized_paths = []
-        for original_path in paths:
-            if sanitized_path := original_path.lstrip("/"):
-                normalized_paths.append(sanitized_path)
-
-            else:
-                raise ValueError("Object paths must not be empty or point to the bucket root.")
+        normalized_paths = _normalize_storage_paths(paths)
         bucket_client = self.client.storage.from_(bucket_id)
         return bucket_client.create_signed_urls(normalized_paths, expires_in)
 
@@ -422,10 +478,7 @@ class SupabaseConnection(BaseConnection[Client]):
         path : str
             The file path, including the file name. Leading slashes are stripped; empty values raise an error.
         """
-        sanitized_path = path.lstrip("/")
-        if not sanitized_path:
-            raise ValueError("Object path must not be empty or point to the bucket root.")
-
+        sanitized_path = _normalize_storage_path(path)
         bucket_client = self.client.storage.from_(bucket_id)
         signed_upload = bucket_client.create_signed_upload_url(sanitized_path)
         return {
@@ -437,10 +490,9 @@ class SupabaseConnection(BaseConnection[Client]):
     def upload_to_signed_url(
         self,
         bucket_id: str,
-        source: Literal["local", "hosted"],
         path: str,
         token: str,
-        file: Union[str, Path, BytesIO],
+        file: Union[str, Path, BytesIO, bytes, IO[bytes]],
     ) -> "dict[str, str]":
         """Upload a file with a token generated from `.create_signed_url()`
 
@@ -448,52 +500,34 @@ class SupabaseConnection(BaseConnection[Client]):
         ----------
         bucket_id : str
             Unique identifier of the bucket.
-        source : str
-            "local" to upload file from your local filesystem,
-            "hosted" to upload file from the Streamlit hosted filesystem.
         path : str
             The file path, including the file name. This path will be created if it does not exist.
             Leading slashes are stripped; empty values raise an error.
         token : str
             The token generated from `.create_signed_url()` for the specified `path`
-        file : str, Path, BytesIO
-            File to upload. This can be a path of the file if `source="hosted"`,
-            or the `BytesIO` object returned by `st.file_uploader()` if `source="local"`.
+        file : str, Path, BytesIO, bytes, IO[bytes]
+            File to upload. Accepts:
+                * A local path (`str` or `pathlib.Path`)
+                * The `BytesIO` object returned by `st.file_uploader()`
+                * Raw `bytes`
+                * Open file handles (`IO[bytes]`)
         """
-        sanitized_path = path.lstrip("/")
-        if not sanitized_path:
-            raise ValueError("Object path must not be empty or point to the bucket root.")
+        sanitized_path = _normalize_storage_path(path)
 
         bucket_client = self.client.storage.from_(bucket_id)
         filename = sanitized_path.rsplit("/", maxsplit=1)[-1]
-        content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        payload, content_type, cleanup = _prepare_upload_payload(file, filename)
 
-        if source == "local":
-            if inferred_type := getattr(file, "type", None):
-                content_type = inferred_type
-            if hasattr(file, "seek"):
-                file.seek(0)
-            if hasattr(file, "getvalue"):
-                payload: Union[bytes, BytesIO] = file.getvalue()
-            else:
-                payload = file.read()
+        try:
             upload_response = bucket_client.upload_to_signed_url(
                 sanitized_path,
                 token,
                 payload,
                 file_options={"content-type": content_type},
             )
-        elif source == "hosted":
-            with open(file, "rb") as f_obj:
-                host_content_type = mimetypes.guess_type(file)[0] or content_type
-                upload_response = bucket_client.upload_to_signed_url(
-                    sanitized_path,
-                    token,
-                    f_obj,
-                    file_options={"content-type": host_content_type},
-                )
-        else:
-            raise ValueError("source must be either 'local' or 'hosted'")
+        finally:
+            if cleanup:
+                cleanup()
 
         return {
             "path": upload_response.path,
