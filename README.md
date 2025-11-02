@@ -20,23 +20,74 @@
 
 A Streamlit connection component to connect Streamlit to Supabase Storage, Database, and Auth.
 
+## Contents
+- [:electric\_plug: Streamlit Supabase Connector](#electric_plug-streamlit-supabase-connector)
+  - [Contents](#contents)
+  - [🚀 Quickstart](#-quickstart)
+  - [:student: Interactive tutorial](#student-interactive-tutorial)
+  - [:thinking: Why use this?](#thinking-why-use-this)
+  - [:hammer\_and\_wrench: Setup](#hammer_and_wrench-setup)
+  - [:magic\_wand: Usage](#magic_wand-usage)
+  - [:ok\_hand: Supported methods](#ok_hand-supported-methods)
+  - [:books: Examples](#books-examples)
+    - [:package: Storage operations](#package-storage-operations)
+      - [List existing buckets](#list-existing-buckets)
+      - [Create a bucket](#create-a-bucket)
+      - [Get bucket details](#get-bucket-details)
+      - [Update a bucket](#update-a-bucket)
+      - [Move files in a bucket](#move-files-in-a-bucket)
+      - [List objects in a bucket](#list-objects-in-a-bucket)
+      - [Empty a bucket](#empty-a-bucket)
+      - [Delete a bucket](#delete-a-bucket)
+    - [:file\_cabinet: Database operations](#file_cabinet-database-operations)
+      - [Simple query](#simple-query)
+      - [Query with join](#query-with-join)
+      - [Filter through foreign tables](#filter-through-foreign-tables)
+      - [Insert rows](#insert-rows)
+    - [:lock: Auth operations](#lock-auth-operations)
+      - [Create new user](#create-new-user)
+      - [Sign in with password](#sign-in-with-password)
+      - [Retrieve session](#retrieve-session)
+      - [Retrieve user](#retrieve-user)
+      - [Sign out](#sign-out)
+  - [:star: Explore all options in a demo app](#star-explore-all-options-in-a-demo-app)
+  - [:bow: Acknowledgements](#bow-acknowledgements)
+  - [:hugs: Want to support my work?](#hugs-want-to-support-my-work)
+
 ## 🚀 Quickstart
 
-```python
-import streamlit as st
-from st_supabase_connection import SupabaseConnection
+1. Install the connector and its dependencies.
 
-st_supabase_client = st.connection(
-    name="supabase_connection",
-    type=SupabaseConnection,
-    url=<your-supabase-url>,
-    key=<your-supabase-key>
-)
+    ```bash
+    pip install st-supabase-connection
+    ```
 
-# Example: List buckets
-buckets = st_supabase_client.list_buckets()
-st.write(buckets)
-```
+2. Provide your Supabase credentials. In Streamlit Cloud, add them to `secrets.toml`:
+
+    ```toml
+    [connections.supabase_connection]
+    url = "https://your-project.supabase.co"
+    key = "service_role_or_anon_key"
+    ```
+
+    For local development you can use environment variables (`SUPABASE_URL`, `SUPABASE_KEY`) or pass the values directly during connection creation.
+
+3. Create the cached connection in your app.
+
+    ```python
+    import streamlit as st
+    from st_supabase_connection import SupabaseConnection
+
+    st_supabase = st.connection(
+        name="supabase_connection",
+        type=SupabaseConnection,
+        ttl=None,  # cache indefinitely; override when you need fresher data
+    )
+
+    # Example: list buckets without re-authenticating on every rerun
+    buckets = st_supabase.list_buckets()
+    st.write(buckets)
+    ```
 
 ## :student: Interactive tutorial
 
@@ -53,6 +104,7 @@ st.write(buckets)
 - [x] Cache functionality to cache returned results. **Save time and money** on your API requests
 - [x] Same method names as the Supabase Python API. **Minimum relearning required**
 - [x] **Exposes more storage methods** than currently supported by the Supabase Python API. For example, `update()`, `create_signed_upload_url()`, and `upload_to_signed_url()`
+- [x] Handles common Supabase quirks—leading slashes are normalised, MIME types inferred, and downloads streamed in memory—so you spend less time on glue code.
 - [x] **Less keystrokes required** when integrating with your Streamlit app.
 
 <details close>
@@ -112,8 +164,9 @@ source_path = st.text_input("Enter source path")
 
 if st.button("Request download"):
     file_name, mime, data = st_supabase_client.download(
-        bucket_id, source_path,
-    )
+        bucket_id,
+        source_path,
+    )  # returns (name, mime_type, bytes)
 
     st.download_button(
         "Download file", data=data,
@@ -169,7 +222,7 @@ st_supabase_client = st.connection(
 )
 
 bucket_id = st.text_input("Enter the bucket_id")
-uploaded_file = st.file_uploader("Choose a file"):
+uploaded_file = st.file_uploader("Choose a file")
 destination_path = st.text_input("Enter destination path")
 overwrite = "true" if st.checkbox("Overwrite?") else "false"
 
@@ -216,7 +269,22 @@ st_supabase_client = st.connection(
 )
 ```
 
-3. Use in your app to query tables and files, and add authentication. Happy Streamlit-ing! :balloon:
+3. Use the connection to work with Storage, Database, and Auth in a cached, Streamlit-friendly way:
+
+    ```python
+    # Storage
+    file_name, mime, data = st_supabase.download("bucket", "path/to/report.csv", ttl=300)
+
+    # Database (leverages postgrest-py under the hood)
+    from st_supabase_connection import execute_query
+    users = execute_query(
+        st_supabase.table("users").select("name, email").order("created_at", desc=True),
+        ttl="15m",
+    )
+
+    # Auth (cached helper)
+    st_supabase.cached_sign_in_with_password({"email": email, "password": password})
+    ```
 
 ## :ok_hand: Supported methods
 
