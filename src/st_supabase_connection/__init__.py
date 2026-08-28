@@ -1,9 +1,12 @@
+import hashlib
 import mimetypes
 import os
+import warnings
+from collections.abc import Callable, Iterable, MutableMapping
 from datetime import timedelta
 from io import BytesIO
 from pathlib import Path
-from typing import IO, Callable, Iterable, Literal, Optional, Tuple, Union
+from typing import IO, Any, Literal, Optional, Tuple, Union, cast
 
 from postgrest import (
     APIResponse,
@@ -11,14 +14,71 @@ from postgrest import (
     SyncQueryRequestBuilder,
     SyncSelectRequestBuilder,
 )
-from streamlit import cache_data, cache_resource
+from streamlit import cache_data, cache_resource, session_state
 from streamlit.connections import BaseConnection
 from supabase import Client, create_client
 from supabase_auth.types import AuthResponse, SignInWithPasswordCredentials
 
-__version__ = "2.1.3"
+__version__ = "2.2.0"
 
 _DEFAULT_MIME_TYPE = "application/octet-stream"
+_SESSION_CLIENT_STATE_PREFIX = "_st_supabase_connection_session_client"
+
+
+def _credential_fingerprint(url: str, key: str) -> str:
+    return hashlib.sha256(f"{url}\0{key}".encode()).hexdigest()
+
+
+def _get_or_create_session_client(
+    state: MutableMapping[str, Any],
+    *,
+    connection_name: str,
+    url: str,
+    key: str,
+    client_factory: Optional[Callable[[str, str], Client]] = None,
+) -> Client:
+    """Return one Supabase client per Streamlit browser session and connection."""
+    normalized_url = url.strip()
+    normalized_key = key.strip()
+    if not normalized_url or not normalized_key:
+        raise ValueError("Supabase URL and key are required.")
+
+    fingerprint = _credential_fingerprint(normalized_url, normalized_key)
+    state_key = f"{_SESSION_CLIENT_STATE_PREFIX}:{connection_name}:{fingerprint}"
+    existing_client = state.get(state_key)
+    if existing_client is not None:
+        return cast(Client, existing_client)
+
+    factory = client_factory or create_client
+    client = factory(normalized_url, normalized_key)
+    state[state_key] = client
+    return client
+
+
+def _query_hash(query: Any) -> str:
+    """Hash a query without exposing credentials or sharing cached user data."""
+    request = query.request
+    headers = getattr(request, "headers", {})
+    try:
+        header_items = headers.items()
+    except AttributeError:
+        header_items = ()
+    normalized_headers = []
+    for name, value in header_items:
+        normalized_name = str(name).lower()
+        normalized_value = str(value)
+        if normalized_name in {"authorization", "apikey"}:
+            normalized_value = hashlib.sha256(normalized_value.encode()).hexdigest()
+        normalized_headers.append((normalized_name, normalized_value))
+    material = (
+        str(getattr(request, "method", "")),
+        str(getattr(request, "url", "")),
+        str(getattr(request, "path", "")),
+        str(getattr(request, "params", "")),
+        str(getattr(request, "json", None) or {}),
+        tuple(sorted(normalized_headers)),
+    )
+    return hashlib.sha256(repr(material).encode()).hexdigest()
 
 
 def _normalize_storage_path(path: str) -> str:
@@ -116,8 +176,12 @@ class SupabaseConnection(BaseConnection[Client]):
 
         if "key" in kwargs:
             key = kwargs.pop("key")
+        elif "SUPABASE_PUBLISHABLE_KEY" in self._secrets:
+            key = self._secrets["SUPABASE_PUBLISHABLE_KEY"]
         elif "SUPABASE_KEY" in self._secrets:
             key = self._secrets["SUPABASE_KEY"]
+        elif "SUPABASE_PUBLISHABLE_KEY" in os.environ:
+            key = os.environ.get("SUPABASE_PUBLISHABLE_KEY")
         elif "SUPABASE_KEY" in os.environ:
             key = os.environ.get("SUPABASE_KEY")
         else:
@@ -125,35 +189,66 @@ class SupabaseConnection(BaseConnection[Client]):
                 "Supabase Key not provided. "
                 "You can provide the key by "
                 "passing it as the 'key' kwarg while creating the connection, or "
-                "setting the 'SUPABASE_KEY' Streamlit secret or environment variable."
+                "setting the 'SUPABASE_KEY' or 'SUPABASE_PUBLISHABLE_KEY' "
+                "Streamlit secret or environment variable."
             )
 
-        self.client = create_client(url, key)
+        self._url = url
+        self._key = key
+        self.client = create_client(self._url, self._key)
         self.table = self.client.table
-        self.auth = self.client.auth
+        self._shared_auth = self.client.auth
         self.delete_bucket = self.client.storage.delete_bucket
         self.empty_bucket = self.client.storage.empty_bucket
+
+    @property
+    def auth(self):
+        """Return the deprecated process-shared Auth client.
+
+        Use ``session_client().auth`` so login state and tokens are isolated to the
+        current Streamlit browser session.
+        """
+        warnings.warn(
+            "`SupabaseConnection.auth` is deprecated because Streamlit connections "
+            "are shared across sessions; use `session_client().auth` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._shared_auth
+
+    def session_client(self) -> Client:
+        """Return a full Supabase client scoped to the current browser session.
+
+        Use this client for Auth and for database, storage, functions, or realtime
+        operations that must carry the signed-in user's JWT.
+        """
+        return _get_or_create_session_client(
+            session_state,
+            connection_name=self._connection_name,
+            url=self._url,
+            key=self._key,
+        )
 
     def cached_sign_in_with_password(
         self,
         credentials: SignInWithPasswordCredentials,
         ttl: Optional[Union[float, timedelta, str]] = None,
     ) -> AuthResponse:
-        """Sign in with email and password or phone number and password, with caching enabled.
+        """Sign in through the session-scoped client without caching credentials.
 
-        Parameters
-        ----------
-        credentials : SignInWithPasswordCredentials
-            The credentials to sign in with. This can be an email and password, or a phone number and password.
-        ttl : float, timedelta, str, or None
-            The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
+        .. deprecated:: 2.2.0
+            Use ``session_client().auth.sign_in_with_password(credentials)``.
+            The ``ttl`` argument is retained for compatibility and ignored.
         """
-
-        @cache_resource(ttl=ttl)
-        def _sign_in_with_password(_self, credentials):
-            return _self.auth.sign_in_with_password(credentials)
-
-        return _sign_in_with_password(self, credentials)
+        _ = ttl
+        warnings.warn(
+            "`cached_sign_in_with_password()` is deprecated because Auth responses "
+            "must not be shared through Streamlit's global cache; use "
+            "`session_client().auth.sign_in_with_password()` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.session_client().auth.sign_in_with_password(credentials)
 
     def get_bucket(
         self,
@@ -256,27 +351,28 @@ class SupabaseConnection(BaseConnection[Client]):
         overwrite : str
             Whether to overwrite existing file. Defaults to `false`.
         """
+        if source not in {"local", "hosted"}:
+            raise ValueError("source must be either 'local' or 'hosted'.")
 
-        if source == "local":
-            with open(file.name, "wb") as f:
-                f.write(file.getbuffer())
-            with open(file.name, "rb") as f:
-                response = self.client.storage.from_(bucket_id).upload(
-                    path=destination_path or f"/{file.name}",
-                    file=f,
-                    file_options={"content-type": file.type, "x-upsert": overwrite},
-                )
-        elif source == "hosted":
-            with open(file, "rb") as f:
-                response = self.client.storage.from_(bucket_id).upload(
-                    path=destination_path or f"/{os.path.basename(f.name)}",
-                    file=f,
-                    file_options={
-                        "content-type": mimetypes.guess_type(file)[0],
-                        "x-upsert": overwrite,
-                    },
-                )
-        return response
+        if isinstance(file, (str, Path)):
+            fallback_name = Path(file).name
+        else:
+            fallback_name = Path(getattr(file, "name", "upload.bin")).name
+        target_path = _normalize_storage_path(destination_path or fallback_name)
+        payload, content_type, cleanup = _prepare_upload_payload(file, fallback_name)
+
+        try:
+            return self.client.storage.from_(bucket_id).upload(
+                path=target_path,
+                file=payload,
+                file_options={
+                    "content-type": content_type,
+                    "x-upsert": overwrite,
+                },
+            )
+        finally:
+            if cleanup:
+                cleanup()
 
     def download(
         self,
@@ -554,15 +650,12 @@ def execute_query(
         The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
     """
 
-    def _hash_func(x):
-        return hash(str(x.request.path) + str(x.request.params) + str(x.request.json or {}))
-
     @cache_resource(
         ttl=ttl,
         hash_funcs={
-            SyncSelectRequestBuilder: _hash_func,
-            SyncQueryRequestBuilder: _hash_func,
-            SyncFilterRequestBuilder: _hash_func,
+            SyncSelectRequestBuilder: _query_hash,
+            SyncQueryRequestBuilder: _query_hash,
+            SyncFilterRequestBuilder: _query_hash,
         },
     )
     def _execute(query):

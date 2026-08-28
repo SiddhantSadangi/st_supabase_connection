@@ -1,696 +1,241 @@
-# :electric_plug: Streamlit Supabase Connector
+# Streamlit Supabase Connection
 
 <div align="center">
+  <a href="https://github.com/SiddhantSadangi/st_supabase_connection/actions/workflows/ci.yml">
+    <img src="https://github.com/SiddhantSadangi/st_supabase_connection/actions/workflows/ci.yml/badge.svg" alt="CI status">
+  </a>
+  <a href="https://pypi.org/project/st-supabase-connection/">
+    <img src="https://img.shields.io/pypi/v/st-supabase-connection" alt="PyPI version">
+  </a>
+  <a href="https://pypi.org/project/st-supabase-connection/">
+    <img src="https://img.shields.io/pypi/pyversions/st-supabase-connection" alt="Supported Python versions">
+  </a>
   <a href="https://pepy.tech/project/st-supabase-connection">
     <img src="https://static.pepy.tech/personalized-badge/st-supabase-connection?period=total&units=international_system&left_color=black&right_color=brightgreen&left_text=Downloads" alt="Downloads">
   </a>
-  <a href="https://badge.fury.io/py/st-supabase-connection">
-    <img src="https://badge.fury.io/py/st-supabase-connection.svg" alt="PyPI version">
-  </a>
   <a href="https://opensource.org/licenses/MIT">
-    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
-  </a>
-  <a href="https://github.com/SiddhantSadangi/st_supabase_connection/issues">
-    <img src="https://img.shields.io/github/issues/SiddhantSadangi/st_supabase_connection.svg" alt="Issues">
-  </a>
-  <a href="https://github.com/SiddhantSadangi/st_supabase_connection/pulls">
-    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT license">
   </a>
 </div>
 
-A Streamlit connection component to connect Streamlit to Supabase Storage, Database, and Auth.
+Use Supabase Storage, Database, and Auth from Streamlit with Streamlit-aware caching and browser-session-safe authentication.
 
-## Contents
-- [:electric\_plug: Streamlit Supabase Connector](#electric_plug-streamlit-supabase-connector)
-  - [Contents](#contents)
-  - [🚀 Quickstart](#-quickstart)
-  - [:student: Interactive tutorial](#student-interactive-tutorial)
-  - [:thinking: Why use this?](#thinking-why-use-this)
-  - [:hammer\_and\_wrench: Setup](#hammer_and_wrench-setup)
-  - [:magic\_wand: Usage](#magic_wand-usage)
-  - [:ok\_hand: Supported methods](#ok_hand-supported-methods)
-  - [:books: Examples](#books-examples)
-    - [:package: Storage operations](#package-storage-operations)
-      - [List existing buckets](#list-existing-buckets)
-      - [Create a bucket](#create-a-bucket)
-      - [Get bucket details](#get-bucket-details)
-      - [Update a bucket](#update-a-bucket)
-      - [Move files in a bucket](#move-files-in-a-bucket)
-      - [List objects in a bucket](#list-objects-in-a-bucket)
-      - [Empty a bucket](#empty-a-bucket)
-      - [Delete a bucket](#delete-a-bucket)
-    - [:file\_cabinet: Database operations](#file_cabinet-database-operations)
-      - [Simple query](#simple-query)
-      - [Query with join](#query-with-join)
-      - [Filter through foreign tables](#filter-through-foreign-tables)
-      - [Insert rows](#insert-rows)
-    - [:lock: Auth operations](#lock-auth-operations)
-      - [Create new user](#create-new-user)
-      - [Sign in with password](#sign-in-with-password)
-      - [Retrieve session](#retrieve-session)
-      - [Retrieve user](#retrieve-user)
-      - [Sign out](#sign-out)
-  - [:star: Explore all options in a demo app](#star-explore-all-options-in-a-demo-app)
-  - [:bow: Acknowledgements](#bow-acknowledgements)
-  - [:hugs: Want to support my work?](#hugs-want-to-support-my-work)
+[Open the interactive demo](https://st-supabase-connection.streamlit.app/) ·
+[Read the guides](https://github.com/SiddhantSadangi/st_supabase_connection/tree/main/docs) ·
+[View the changelog](https://github.com/SiddhantSadangi/st_supabase_connection/blob/main/CHANGELOG.md)
 
-## 🚀 Quickstart
+## Why use it?
 
-1. Install the connector and its dependencies.
+- Use `st.connection()` and Streamlit secrets for Supabase configuration.
+- Cache Storage and Database reads with familiar `ttl` values such as `"10m"`.
+- Keep Supabase Auth tokens isolated to the current Streamlit browser session.
+- Upload `st.file_uploader()` results without first writing them to the app server.
+- Normalize Storage paths and infer common MIME types automatically.
 
-    ```bash
-    pip install st-supabase-connection
-    ```
+## Requirements
 
-2. Provide your Supabase credentials. In Streamlit Cloud, add them to `secrets.toml`:
+| Component | Supported version |
+|---|---|
+| Python | 3.10 or newer |
+| Streamlit | 1.62.0 or newer |
+| Supabase Python | 2.22.0 or newer |
 
-    ```toml
-    [connections.supabase_connection]
-    url = "https://your-project.supabase.co"
-    key = "service_role_or_anon_key"
-    ```
+## Quickstart
 
-    For local development you can use environment variables (`SUPABASE_URL`, `SUPABASE_KEY`) or pass the values directly during connection creation.
+Install the package:
 
-3. Create the cached connection in your app.
-
-    ```python
-    import streamlit as st
-    from st_supabase_connection import SupabaseConnection
-
-    st_supabase = st.connection(
-        name="supabase_connection",
-        type=SupabaseConnection,
-        ttl=None,  # cache indefinitely; override when you need fresher data
-    )
-
-    # Example: list buckets without re-authenticating on every rerun
-    buckets = st_supabase.list_buckets()
-    st.write(buckets)
-    ```
-
-## :student: Interactive tutorial
-
-<div align="center">
-    <a href="https://st-supabase-connection.streamlit.app/">
-        <img src="https://static.streamlit.io/badges/streamlit_badge_black_white.svg" alt="Open in Streamlit" style="height: 60px !important;width: 217px !important;">
-    </a>
-</div>
-
-![Web capture_2-12-2023_124639_st-supabase-connection streamlit app](https://github.com/SiddhantSadangi/st_supabase_connection/assets/41324509/2870b021-48a0-4143-9693-c840880a28be)
-
-## :thinking: Why use this?
-
-- [x] Cache functionality to cache returned results. **Save time and money** on your API requests
-- [x] Same method names as the Supabase Python API. **Minimum relearning required**
-- [x] **Exposes more storage methods** than currently supported by the Supabase Python API. For example, `update()`, `create_signed_upload_url()`, and `upload_to_signed_url()`
-- [x] Handles common Supabase quirks—leading slashes are normalised, MIME types inferred, and downloads streamed in memory—so you spend less time on glue code.
-- [x] **Less keystrokes required** when integrating with your Streamlit app.
-
-<details close>
-<summary>Examples with and without the connector </summary>
-<br>
-<table>
-<tr>
-<td><b>Without connector</b></td><td><b>With connector</b></td>
-<tr>
-<td colspan="2"> Download file to local system from Supabase storage </td>
-<tr>
-<td valign="top">
-
-```python
-import mimetypes
-import streamlit as st
-from supabase import create_client
-
-supabase_client = create_client(
-    supabase_url="...", supabase_key="..."
-)
-
-bucket_id = st.text_input("Enter the bucket_id")
-source_path = st.text_input("Enter source path")
-
-file_name = source_path.split("/")[-1]
-
-if st.button("Request download"):
-    with open(file_name, "wb+") as f:
-        response = supabase_client.storage.from_(
-        bucket_id
-        ).download(source_path)
-        f.write(response)
-
-    mime = mimetypes.guess_type(file_name)[0]
-    data = open(file_name, "rb")
-
-    st.download_button(
-        "Download file", data=data,
-        file_name=file_name, mime=mime,
-    )
-```
-
-</td>
-<td valign="top">
-
-```python
-import streamlit as st
-from st_supabase_connection import SupabaseConnection
-
-st_supabase_client = st.connection(
-    name="supabase_connection", type=SupabaseConnection
-)
-
-bucket_id = st.text_input("Enter the bucket_id")
-source_path = st.text_input("Enter source path")
-
-if st.button("Request download"):
-    file_name, mime, data = st_supabase_client.download(
-        bucket_id,
-        source_path,
-    )  # returns (name, mime_type, bytes)
-
-    st.download_button(
-        "Download file", data=data,
-        file_name=file_name, mime=mime,
-    )
-
-```
-
-</td>
-<tr>
-<td colspan="2"> Upload file from local system to Supabase storage </td>
-<tr>
-<td valign="top">
-
-```python
-import streamlit as st
-from supabase import create_client
-
-supabase_client = create_client(
-supabase_key="...", supabase_url="..."
-)
-
-bucket_id = st.text_input("Enter the bucket_id")
-uploaded_file = st.file_uploader("Choose a file")
-destination_path = st.text_input("Enter destination path")
-overwrite = "true" if st.checkbox("Overwrite?") else "false"
-
-with open(uploaded_file.name, "wb") as f:
-    f.write(uploaded_file.getbuffer())
-
-if st.button("Upload"):
-    with open(uploaded_file.name, "rb") as f:
-        supabase_client.storage.from_(bucket_id).upload(
-            path=destination_path,
-            file=f,
-            file_options={
-            "content-type": uploaded_file.type,
-            "x-upsert": overwrite,
-            },
-        )
-
-```
-
-</td>
-<td valign="top">
-
-```python
-import streamlit as st
-from st_supabase_connection import SupabaseConnection
-
-st_supabase_client = st.connection(
-    name="supabase_connection", type=SupabaseConnection
-)
-
-bucket_id = st.text_input("Enter the bucket_id")
-uploaded_file = st.file_uploader("Choose a file")
-destination_path = st.text_input("Enter destination path")
-overwrite = "true" if st.checkbox("Overwrite?") else "false"
-
-if st.button("Upload"):
-    st_supabase_client.upload(
-        bucket_id, "local", uploaded_file,
-        destination_path, overwrite,
-    )
-```
-
-<tr>
-</table>
-
-</details>
-
-## :hammer_and_wrench: Setup
-
-1. Install `st-supabase-connection`
-
-```sh
+```bash
 pip install st-supabase-connection
 ```
 
-2. Set the `SUPABASE_URL` and `SUPABASE_KEY` Streamlit secrets as described [here](https://docs.streamlit.io/streamlit-community-cloud/get-started/deploy-an-app/connect-to-data-sources/secrets-management).
+Add your project URL and publishable key to `.streamlit/secrets.toml`:
 
-> [!NOTE]  
-> For local development outside Streamlit, you can also set these as your environment variables (recommended), or pass these to the `url` and `key` args of `st.connection()`.
-
-## :magic_wand: Usage
-
-1. Import
-
-```python
-from st_supabase_connection import SupabaseConnection, execute_query
+```toml
+[connections.supabase_connection]
+SUPABASE_URL = "https://your-project.supabase.co"
+SUPABASE_PUBLISHABLE_KEY = "sb_publishable_..."
 ```
 
-2. Initialize
+Create the connection and make a cached read:
 
 ```python
-st_supabase_client = st.connection(
-    name="YOUR_CONNECTION_NAME",
+import streamlit as st
+
+from st_supabase_connection import SupabaseConnection
+
+connection = st.connection(
+    "supabase_connection",
     type=SupabaseConnection,
-    ttl=None,
 )
+
+buckets = connection.list_buckets(ttl="10m")
+st.write(buckets)
 ```
 
-3. Use the connection to work with Storage, Database, and Auth in a cached, Streamlit-friendly way:
+The legacy `SUPABASE_KEY` setting is still supported. New user-facing apps should use a Supabase publishable key. Never use a secret or `service_role` key for user-scoped operations because those keys bypass Row Level Security.
 
-    ```python
-    # Storage
-    file_name, mime, data = st_supabase.download("bucket", "path/to/report.csv", ttl=300)
+You can also supply `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` as environment variables, or pass `url=` and `key=` to `st.connection()`.
 
-    # Database (leverages postgrest-py under the hood)
-    from st_supabase_connection import execute_query
-    users = execute_query(
-        st_supabase.table("users").select("name, email").order("created_at", desc=True),
-        ttl="15m",
-    )
+## Choose the right client
 
-    # Auth (cached helper)
-    st_supabase.cached_sign_in_with_password({"email": email, "password": password})
-    ```
+Streamlit connection objects are cached resources and may be shared between browser sessions. Choose the client based on whether the operation depends on a signed-in user.
 
-## :ok_hand: Supported methods
+| Use case | Recommended API |
+|---|---|
+| Public or anonymous cached reads | The shared `connection` and its cached helpers |
+| Supabase Auth | `connection.session_client().auth` |
+| Reads or writes protected by the signed-in user's RLS policies | The same `connection.session_client()` used for sign-in |
+| Privileged administrative work | A separate, secured backend using a secret key—not a user-facing app flow |
 
-<details close>
-<summary> Storage </summary>
-<ul>
-    <li> <code>delete_bucket()</code> </li>
-    <li> <code>empty_bucket()</code> </li>
-    <li> <code>get_bucket()</code> </li>
-    <li> <code>list_buckets()</code> </li>
-    <li> <code>create_bucket()</code> </li>
-    <li> <code>upload()</code> </li>
-    <li> <code>download()</code> </li>
-    <li> <code>update_bucket()</code> </li>
-    <li> <code>move()</code> </li>
-    <li> <code>list_objects()</code> </li>
-    <li> <code>create_signed_urls()</code> </li>
-    <li> <code>get_public_url()</code> </li>
-    <li> <code>create_signed_upload_url()</code> </li>
-    <li> <code>upload_to_signed_url()</code> </li>
-</ul>
-
-</details>
-
-<details close>
-<summary> Database </summary>
-<ul>
-    <li> <code>execute_query()</code> - Executes the passed query with caching enabled. </li>
-    <li> All methods supported by <a href="https://postgrest-py.readthedocs.io/en/latest/api/request_builders.html">postgrest-py</a>.
-</details>
-
-<details>
-<summary> Auth </summary>
-<ul>
-    <li> <code>cached_sign_in_with_password()</code> - Cached version of <code>sign_in_with_password()</code> for faster sign-in. </li>
-    <li> All methods supported by <a href="https://supabase.com/docs/reference/python/auth-signup">Supabase's Python API </a>.
-</details>
-
-## :books: Examples
-
-### :package: Storage operations
-
-#### List existing buckets
+Create the session-scoped client inside the Streamlit script:
 
 ```python
->>> st_supabase_client.list_buckets(ttl=None)
-[
-    SyncBucket(
-        id="bucket1",
-        name="bucket1",
-        owner="",
-        public=False,
-        created_at=datetime.datetime(2023, 7, 31, 19, 56, 21, 518438, tzinfo=tzutc()),
-        updated_at=datetime.datetime(2023, 7, 31, 19, 56, 21, 518438, tzinfo=tzutc()),
-        file_size_limit=None,
-        allowed_mime_types=None,
-    ),
-    SyncBucket(
-        id="bucket2",
-        name="bucket2",
-        owner="",
-        public=True,
-        created_at=datetime.datetime(2023, 7, 31, 19, 56, 28, 203536, tzinfo=tzutc()),
-        updated_at=datetime.datetime(2023, 7, 31, 19, 56, 28, 203536, tzinfo=tzutc()),
-        file_size_limit=100,
-        allowed_mime_types=["image/jpg", "image/png"],
-    ),
-]
+supabase = connection.session_client()
 ```
 
-#### Create a bucket
+Reuse that client for Auth and user-specific operations. Do not put it in a module-level variable, `st.cache_resource`, or another global cache.
+
+## Caching behavior
+
+There are two different kinds of `ttl`:
+
+| Where `ttl` is set | What it controls |
+|---|---|
+| `st.connection(..., ttl=...)` | How long Streamlit keeps the connection object |
+| `connection.list_buckets(ttl=...)`, `connection.download(ttl=...)`, or `execute_query(..., ttl=...)` | How long the returned result is cached |
+
+In most apps, omit `ttl` from `st.connection()` and set a finite `ttl` on reads that can change:
 
 ```python
->>> st_supabase_client.create_bucket("new_bucket")
-{'name': 'new_bucket'}
-```
+from st_supabase_connection import execute_query
 
-#### Get bucket details
-
-```python
->>> st_supabase_client.get_bucket("new_bucket")
-SyncBucket(id='new_bucket', name='new_bucket', owner='', public=True, created_at=datetime.datetime(2023, 8, 2, 19, 41, 44, 810000, tzinfo=tzutc()), updated_at=datetime.datetime(2023, 8, 2, 19, 41, 44, 810000, tzinfo=tzutc()), file_size_limit=None, allowed_mime_types=None)
-```
-
-#### Update a bucket
-
-```python
->>> st_supabase_client.update_bucket(
-      "new_bucket",
-      file_size_limit=100,
-      allowed_mime_types=["image/jpg", "image/png"],
-      public=True,
-    )
-{'message': 'Successfully updated'}
-```
-
-#### Move files in a bucket
-
-```python
->>> st_supabase_client.move("new_bucket", "test.png", "folder1/new_test.png")
-{'message': 'Successfully moved'}
-```
-
-#### List objects in a bucket
-
-```python
->>> st_supabase_client.list_objects("new_bucket", path="folder1", ttl=0)
-[
-    {
-        "name": "new_test.png",
-        "id": "e506920e-2834-440e-85f1-1d5476927582",
-        "updated_at": "2023-08-02T19:53:22.53986+00:00",
-        "created_at": "2023-08-02T19:52:20.404391+00:00",
-        "last_accessed_at": "2023-08-02T19:53:21.833+00:00",
-        "metadata": {
-            "eTag": '"814a0034f5549e957ee61360d87457e5"',
-            "size": 473831,
-            "mimetype": "image/png",
-            "cacheControl": "max-age=3600",
-            "lastModified": "2023-08-02T19:53:23.000Z",
-            "contentLength": 473831,
-            "httpStatusCode": 200,
-        },
-    }
-]
-```
-
-#### Empty a bucket
-
-```python
->>> st_supabase_client.empty_bucket("new_bucket")
-{'message': 'Successfully emptied'}
-```
-
-#### Delete a bucket
-
-```python
->>> st_supabase_client.delete_bucket("new_bucket")
-{'message': 'Successfully deleted'}
-```
-
-### :file_cabinet: Database operations
-
-#### Simple query
-
-```python
->>> execute_query(st_supabase_client.table("countries").select("*"), ttl=0)
-APIResponse(
-    data=[
-        {"id": 1, "name": "Afghanistan"},
-        {"id": 2, "name": "Albania"},
-        {"id": 3, "name": "Algeria"},
-    ],
-    count=None,
+countries = execute_query(
+    connection.table("countries").select("id, name").order("name"),
+    ttl="10m",
 )
+st.dataframe(countries.data)
 ```
 
-#### Query with join
+Do not cache Auth calls. For inserts, updates, upserts, and deletes, call Supabase's `.execute()` directly or pass `ttl=0` to `execute_query()`.
+
+See the [caching guide](https://github.com/SiddhantSadangi/st_supabase_connection/blob/main/docs/caching.md) for cache scope, user-specific queries, and invalidation considerations.
+
+## Common workflows
+
+### Upload from `st.file_uploader`
+
+The uploaded file is handled in memory; it does not need to be copied to the app server first.
 
 ```python
->>> execute_query(
-        st_supabase_client.table("users").select("name, teams(name)", count="exact"),
-        ttl="1h",
+uploaded_file = st.file_uploader("Choose a file")
+
+if uploaded_file is not None and st.button("Upload"):
+    connection.upload(
+        bucket_id="documents",
+        source="local",
+        file=uploaded_file,
+        destination_path=f"uploads/{uploaded_file.name}",
+        overwrite="false",
     )
-
-APIResponse(
-    data=[
-        {"name": "Kiran", "teams": [{"name": "Green"}, {"name": "Blue"}]},
-        {"name": "Evan", "teams": [{"name": "Blue"}]},
-    ],
-    count=2,
-)
+    st.success("Upload complete")
 ```
 
-#### Filter through foreign tables
+### Query the database
+
+Use the shared connection for anonymous reads:
 
 ```python
->>> execute_query(
-        st_supabase_client.table("cities").select("name, countries(*)", count="exact").eq("countries.name", "Curaçao"),
-        ttl=None,
+from st_supabase_connection import execute_query
+
+response = execute_query(
+    connection.table("countries").select("id, name").limit(20),
+    ttl="5m",
+)
+st.dataframe(response.data)
+```
+
+Use the session client for rows protected by a signed-in user's RLS policies:
+
+```python
+supabase = connection.session_client()
+response = supabase.table("private_profiles").select("*").execute()
+st.dataframe(response.data)
+```
+
+### Sign in an existing user
+
+```python
+supabase = connection.session_client()
+
+email = st.text_input("Email")
+password = st.text_input("Password", type="password")
+
+if st.button("Sign in"):
+    supabase.auth.sign_in_with_password(
+        {"email": email, "password": password}
     )
-
-APIResponse(
-    data=[
-        {
-            "name": "Kralendijk",
-            "countries": {
-                "id": 2,
-                "name": "Curaçao",
-                "iso2": "CW",
-                "iso3": "CUW",
-                "local_name": None,
-                "continent": None,
-            },
-        },
-        {"name": "Willemstad", "countries": None},
-    ],
-    count=2,
-)
+    st.success("Signed in")
 ```
 
-#### Insert rows
+After sign-in, use the same `supabase` client for all operations that must carry the user's JWT.
+
+## Guides and recipes
+
+- [Storage recipes](https://github.com/SiddhantSadangi/st_supabase_connection/blob/main/docs/storage.md): buckets, uploads, downloads, object management, and signed URLs
+- [Database recipes](https://github.com/SiddhantSadangi/st_supabase_connection/blob/main/docs/database.md): cached reads, joins, filters, writes, RLS, and Data API access
+- [Authentication and security](https://github.com/SiddhantSadangi/st_supabase_connection/blob/main/docs/authentication.md): keys, sign-in, session isolation, sign-out, and user-scoped queries
+- [Caching](https://github.com/SiddhantSadangi/st_supabase_connection/blob/main/docs/caching.md): connection lifetime, result lifetime, and cache-safe writes
+- [Upgrade notes](https://github.com/SiddhantSadangi/st_supabase_connection/blob/main/CHANGELOG.md): behavioral changes and migration guidance
+
+## Supported functionality
+
+The connection includes Streamlit-friendly wrappers for commonly used Storage operations:
+
+- Bucket management: `list_buckets()`, `get_bucket()`, `create_bucket()`, `update_bucket()`, `empty_bucket()`, and `delete_bucket()`
+- Objects: `upload()`, `download()`, `list_objects()`, `move()`, and `remove()`
+- URLs: `get_public_url()`, `create_signed_urls()`, `create_signed_upload_url()`, and `upload_to_signed_url()`
+- Database: `table()` and the cached `execute_query()` helper
+- Auth and other user-scoped Supabase APIs: `session_client()`
+
+Because `session_client()` returns the complete Supabase Python client, it can also be used for Functions, Realtime, and other SDK features that must carry the current user's session.
+
+## Upgrading to 2.2.0
+
+Version 2.2.0 requires Python 3.10+, Streamlit 1.62.0+, and Supabase Python 2.22.0+.
+
+Apps using Auth should replace process-shared access:
 
 ```python
->>> execute_query(
-        st_supabase_client.table("countries").insert(
-            [{"name": "Wakanda", "iso2": "WK"}, {"name": "Wadiya", "iso2": "WD"}], count="None"
-        ),
-        ttl=0,
-    )
-
-APIResponse(
-    data=[
-        {
-            "id": 250,
-            "name": "Wakanda",
-            "iso2": "WK",
-            "iso3": None,
-            "local_name": None,
-            "continent": None,
-        },
-        {
-            "id": 251,
-            "name": "Wadiya",
-            "iso2": "WD",
-            "iso3": None,
-            "local_name": None,
-            "continent": None,
-        },
-    ],
-    count=None,
-)
+# Deprecated
+connection.auth.sign_in_with_password(credentials)
 ```
 
-### :lock: Auth operations
-
-> [!NOTE]  
-> If the call is valid, all Supabase Auth methods return the same response structure:
->
-> ```json
-> {
->   "user": {
->     "id": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544",
->     "app_metadata": {
->       "provider": "email",
->       "providers": ["email"]
->     },
->     "user_metadata": {
->       "attribution": "I made it :)",
->       "fname": "Siddhant"
->     },
->     "aud": "authenticated",
->     "confirmation_sent_at": null,
->     "recovery_sent_at": null,
->     "email_change_sent_at": null,
->     "new_email": null,
->     "invited_at": null,
->     "action_link": null,
->     "email": "test.user@abc.com",
->     "phone": "",
->     "created_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 365359, tzinfo=datetime.timezone.utc)",
->     "confirmed_at": null,
->     "email_confirmed_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 373966, tzinfo=datetime.timezone.utc)",
->     "phone_confirmed_at": null,
->     "last_sign_in_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 377070, tzinfo=datetime.timezone.utc)",
->     "role": "authenticated",
->     "updated_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 381584, tzinfo=datetime.timezone.utc)",
->     "identities": [
->       {
->         "id": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544",
->         "user_id": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544",
->         "identity_data": {
->           "email": "siddhant.sadangi@gmail.com",
->           "sub": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544"
->         },
->         "provider": "email",
->         "created_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 370040, tzinfo=datetime.timezone.utc)",
->         "last_sign_in_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 370002, tzinfo=datetime.timezone.utc)",
->         "updated_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 370040, tzinfo=datetime.timezone.utc)"
->       }
->     ],
->     "factors": null
->   },
->   "session": {
->     "provider_token": null,
->     "provider_refresh_token": null,
->     "access_token": "***",
->     "refresh_token": "***",
->     "expires_in": 3600,
->     "expires_at": 1696800390,
->     "token_type": "bearer",
->     "user": {
->       "id": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544",
->       "app_metadata": {
->         "provider": "email",
->         "providers": ["email"]
->       },
->       "user_metadata": {
->         "attribution": "I made it :)",
->         "fname": "Siddhant"
->       },
->       "aud": "authenticated",
->       "confirmation_sent_at": null,
->       "recovery_sent_at": null,
->       "email_change_sent_at": null,
->       "new_email": null,
->       "invited_at": null,
->       "action_link": null,
->       "email": "test.user@abc.com",
->       "phone": "",
->       "created_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 365359, tzinfo=datetime.timezone.utc)",
->       "confirmed_at": null,
->       "email_confirmed_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 373966, tzinfo=datetime.timezone.utc)",
->       "phone_confirmed_at": null,
->       "last_sign_in_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 377070, tzinfo=datetime.timezone.utc)",
->       "role": "authenticated",
->       "updated_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 381584, tzinfo=datetime.timezone.utc)",
->       "identities": [
->         {
->           "id": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544",
->           "user_id": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544",
->           "identity_data": {
->             "email": "siddhant.sadangi@gmail.com",
->             "sub": "e1f550fd-9cd1-44e4-bbe4-c04e91cf5544"
->           },
->           "provider": "email",
->           "created_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 370040, tzinfo=datetime.timezone.utc)",
->           "last_sign_in_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 370002, tzinfo=datetime.timezone.utc)",
->           "updated_at": "datetime.datetime(2023, 10, 8, 20, 26, 30, 370040, tzinfo=datetime.timezone.utc)"
->         }
->       ],
->       "factors": null
->     }
->   }
-> }
-> ```
->
-> </details>
-
-#### Create new user
+with a session-scoped client:
 
 ```python
-st_supabase_client.auth.sign_up(
-    dict(
-        email='test.user@abc.com',
-        password='***',
-        options=dict(
-            data=dict(
-                fname='Siddhant',
-                attribution='I made it :)',
-            )
-        )
-    )
-)
+supabase = connection.session_client()
+supabase.auth.sign_in_with_password(credentials)
 ```
 
-#### Sign in with password
+`connection.auth` and `cached_sign_in_with_password()` remain available for compatibility but are deprecated. The latter no longer caches its result and ignores `ttl`.
 
-`SupabaseConnection()` offers a cached version of `sign_in_with_password()` for faster, request-free sign-ins.
+See the [2.2.0 changelog](https://github.com/SiddhantSadangi/st_supabase_connection/blob/main/CHANGELOG.md) for the complete migration notes.
 
-```python
-st_supabase_client.cached_sign_in_with_password(dict(email='test.user@abc.com', password='***'))
+## Development
+
+Install the project and demo dependency, then run the library and demo tests:
+
+```bash
+python -m pip install --editable . streamlit-extras
+python -m unittest discover --start-directory tests --verbose
 ```
 
-#### Retrieve session
+The CI workflow tests Python 3.10–3.14 against the minimum and latest supported Streamlit releases.
 
-```python
-st_supabase_client.auth.get_session()
-```
+Issues and pull requests are welcome in the [GitHub repository](https://github.com/SiddhantSadangi/st_supabase_connection).
 
-#### Retrieve user
+## Acknowledgements
 
-```python
-st_supabase_client.auth.get_user()
-```
+This connector builds on [Streamlit](https://streamlit.io/), [Supabase Python](https://github.com/supabase/supabase-py), and the work of the Supabase open-source community.
 
-#### Sign out
-
-```python
-st_supabase_client.auth.sign_out()
-```
-
-> [!NOTE]  
-> Check the [Supabase Python API reference](https://supabase.com/docs/reference/python/select) for more examples.
-
-## :star: Explore all options in a demo app
-
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://st-supabase-connection.streamlit.app/)
-
-## :bow: Acknowledgements
-
-This connector builds upon the awesome work done by the open-source community in general and the [Supabase Community](https://github.com/supabase-community) in particular. I cannot be more thankful to all the authors whose work I have used either directly or indirectly.
-
-Thanks to all contributors to this project :bow:
-
-<p align="center">
-    <a href="https://github.com/SiddhantSadangi/st_supabase_connection/graphs/contributors">
-        <img src="https://contrib.rocks/image?repo=SiddhantSadangi/st_supabase_connection" alt="Contributors" style="height: 60px !important;width: 217px !important;">
-    </a>
-</p>
-
-## :hugs: Want to support my work?
-
-<p align="center">
-    <a href="https://www.buymeacoffee.com/siddhantsadangi" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;">
-    </a>
-    <br>
-    <a href="https://github.com/sponsors/SiddhantSadangi" target="_blank"><img src="https://img.shields.io/badge/Sponsor%20me%20on-GitHub-f34b7d?logo=github&style=flat" alt="Sponsor me on GitHub" style="height: 28px !important;">
-</p>
+If the project helps you, you can [sponsor it on GitHub](https://github.com/sponsors/SiddhantSadangi) or [buy me a coffee](https://www.buymeacoffee.com/siddhantsadangi).
