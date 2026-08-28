@@ -44,9 +44,19 @@ class FakeQuery:
 class FakeSessionClient:
     def __init__(self):
         self.auth = FakeAuth()
+        self.storage = FakeStorage()
 
     def table(self, _table):
         return FakeQuery()
+
+
+class FakeStorage:
+    def __init__(self):
+        self.list_buckets_calls = 0
+
+    def list_buckets(self):
+        self.list_buckets_calls += 1
+        return [{"id": "bucket1", "name": "bucket1", "public": True}]
 
 
 class FakeConnection:
@@ -57,8 +67,7 @@ class FakeConnection:
         return self.session
 
     def list_buckets(self, ttl=None):
-        _ = ttl
-        return [{"id": "bucket1", "name": "bucket1", "public": True}]
+        raise AssertionError("Storage must use the session-scoped client")
 
 
 class DemoAppTests(unittest.TestCase):
@@ -107,7 +116,7 @@ class DemoAppTests(unittest.TestCase):
         self.assertEqual([item.value for item in app.error], [])
 
     def test_demo_storage_read_renders_normalized_result(self):
-        app, _connection = self.connected_app()
+        app, connection = self.connected_app()
 
         app.button(key="storage_run_read").click().run()
 
@@ -115,6 +124,7 @@ class DemoAppTests(unittest.TestCase):
         self.assertEqual([item.value for item in app.success], ["Retrieved 1 bucket"])
         self.assertEqual(len(app.dataframe), 1)
         self.assertEqual(app.dataframe[0].value.shape, (1, 3))
+        self.assertEqual(connection.session.storage.list_buckets_calls, 1)
 
     def test_demo_storage_tasks_use_seeded_choices_without_initial_errors(self):
         app, _connection = self.connected_app()

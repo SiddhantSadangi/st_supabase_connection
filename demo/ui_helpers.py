@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import secrets
 from dataclasses import asdict, is_dataclass
 from typing import Any
 
 import pandas as pd
 import streamlit as st
+
+_ACTION_FINGERPRINT_KEY = "_ux_action_fingerprint_key"
 
 
 class CodeLiteral(str):
@@ -67,13 +71,14 @@ def connection_ttl_input(key: str) -> int | None:
 
 
 def action_fingerprint(scope: str, values: Any) -> str:
-    """Create a stable, non-plaintext identifier for a reviewed action."""
+    """Create a session-bound, non-plaintext identifier for a reviewed action."""
     material = json.dumps(
         {"scope": scope, "values": _to_plain_data(values)},
         sort_keys=True,
         default=str,
     )
-    return hashlib.sha256(material.encode()).hexdigest()
+    key = st.session_state.setdefault(_ACTION_FINGERPRINT_KEY, secrets.token_bytes(32))
+    return hmac.new(key, material.encode(), hashlib.sha256).hexdigest()
 
 
 def sync_result_context(scope: str, action_id: str) -> None:

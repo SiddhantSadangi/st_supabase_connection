@@ -89,6 +89,14 @@ class SessionClientTests(unittest.TestCase):
             "Enter a valid email address.",
         )
         self.assertIsNone(validate_email_address("person@example.com"))
+        self.assertEqual(
+            validate_email_address("!@!." + "!." * 10_000),
+            "Enter a valid email address.",
+        )
+        self.assertEqual(
+            validate_email_address("one@example.com@invalid.test"),
+            "Enter a valid email address.",
+        )
 
         self.assertEqual(validate_sign_up("", "123456"), "Enter an email address.")
         self.assertEqual(

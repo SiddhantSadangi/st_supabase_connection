@@ -5,14 +5,12 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import re
 import uuid
 from collections.abc import Mapping, MutableMapping
 from typing import Any
 from urllib.parse import urlparse
 
 _CUSTOM_CONNECTION_TOKEN_STATE_KEY = "_supabase_custom_connection_token"
-_EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def _mapping_value(mapping: Mapping[str, Any] | None, key: str) -> Any:
@@ -139,9 +137,10 @@ def validate_sign_up(email: str, password: str) -> str | None:
 
 def validate_email_address(email: str) -> str | None:
     """Validate an email address without coupling it to password rules."""
-    if not email.strip():
+    normalized = email.strip()
+    if not normalized:
         return "Enter an email address."
-    if not _EMAIL_PATTERN.fullmatch(email.strip()):
+    if not _is_valid_email(normalized):
         return "Enter a valid email address."
     return None
 
@@ -151,8 +150,19 @@ def validate_password_sign_in(identifier: str, password: str) -> str | None:
     normalized_identifier = identifier.strip()
     if not normalized_identifier:
         return "Enter an email address or phone number."
-    if "@" in normalized_identifier and not _EMAIL_PATTERN.fullmatch(normalized_identifier):
+    if "@" in normalized_identifier and not _is_valid_email(normalized_identifier):
         return "Enter a valid email address."
     if len(password) < 6:
         return "Password must contain at least 6 characters."
     return None
+
+
+def _is_valid_email(value: str) -> bool:
+    """Perform bounded, linear-time validation suitable for a sign-in hint."""
+    if len(value) > 320 or value.count("@") != 1 or any(char.isspace() for char in value):
+        return False
+    local_part, domain = value.split("@", maxsplit=1)
+    if not local_part or len(local_part) > 64 or not domain or len(domain) > 255:
+        return False
+    labels = domain.split(".")
+    return len(labels) >= 2 and all(labels)

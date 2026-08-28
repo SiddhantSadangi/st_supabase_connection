@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 import streamlit as st
+from session_storage import SessionStorage
 from ui_helpers import (
     action_fingerprint,
-    cache_ttl_input,
     clear_result,
     construct_call,
     consume_confirmation,
@@ -21,6 +21,7 @@ from ui_helpers import (
 )
 
 SCOPE = "storage"
+SESSION_CLIENT_CODE = "supabase = st_supabase.session_client()"
 DEMO_OBJECTS = {
     "bucket1": ["awesome_zoom_background.jpg"],
     "bucket2": ["folder1/folder2/lenna.png"],
@@ -89,7 +90,8 @@ def render_storage_workspace(connection: Any, *, project: str, project_label: st
             icon=":material/delete_forever:",
         )
 
-    params, validation_error = _render_inputs(operation, connection, project)
+    storage = SessionStorage(connection.session_client())
+    params, validation_error = _render_inputs(operation, storage, project)
     code = _render_code(operation, params) if validation_error is None else None
 
     if code:
@@ -113,7 +115,7 @@ def render_storage_workspace(connection: Any, *, project: str, project_label: st
             key="storage_run_read",
         )
         if clicked:
-            _execute(connection, operation, params, selected_label)
+            _execute(storage, operation, params, selected_label)
     else:
         button_label = "Review destructive action" if risk == "Destructive" else "Review write"
         clicked = st.button(
@@ -137,14 +139,14 @@ def render_storage_workspace(connection: Any, *, project: str, project_label: st
                 phrase=phrase,
             )
         if confirmed:
-            _execute(connection, operation, params, selected_label)
+            _execute(storage, operation, params, selected_label)
 
     render_result(SCOPE)
 
 
 def _render_inputs(
     operation: str,
-    connection: Any,
+    storage: SessionStorage,
     project: str,
 ) -> tuple[dict[str, Any], str | None]:
     params: dict[str, Any] = {}
@@ -163,13 +165,7 @@ def _render_inputs(
                 placeholder="Required",
             ).strip()
 
-    if operation == "list_buckets":
-        params["ttl"] = cache_ttl_input("storage_list_buckets")
-
-    elif operation == "get_bucket":
-        params["ttl"] = cache_ttl_input("storage_get_bucket")
-
-    elif operation == "create_bucket":
+    if operation == "create_bucket":
         left, right = st.columns(2)
         params["name"] = left.text_input(
             "Bucket name",
@@ -205,7 +201,7 @@ def _render_inputs(
             key="storage_load_bucket",
         ):
             try:
-                current = connection.get_bucket(bucket_id, ttl=0)
+                current = storage.get_bucket(bucket_id)
                 st.session_state["storage_update_size"] = int(
                     _property(current, "file_size_limit") or 0
                 )
@@ -310,8 +306,6 @@ def _render_inputs(
             default="Ascending",
             key="storage_list_order",
         )
-        params["ttl"] = cache_ttl_input("storage_list_objects")
-
     elif operation == "download":
         if project == "demo":
             params["source_path"] = st.selectbox(
@@ -325,8 +319,6 @@ def _render_inputs(
                 key="storage_download_path",
                 placeholder="folder/file.ext",
             ).strip()
-        params["ttl"] = cache_ttl_input("storage_download")
-
     elif operation == "get_public_url":
         if project == "demo":
             params["filepath"] = st.selectbox(
@@ -341,8 +333,6 @@ def _render_inputs(
                 placeholder="folder/file.ext",
             ).strip()
         st.caption("Public URLs only provide access when the bucket is public.")
-        params["ttl"] = cache_ttl_input("storage_public_url")
-
     elif operation == "create_signed_urls":
         demo_paths = DEMO_OBJECTS.get(params["bucket_id"], [])
         selection_key = "storage_signed_paths"
@@ -426,114 +416,110 @@ def _validate(operation: str, params: dict[str, Any]) -> str | None:
 
 def _render_code(operation: str, params: dict[str, Any]) -> str:
     bucket = params.get("bucket_id")
+    bucket_api = f"supabase.storage.from_({bucket!r})"
     if operation == "list_buckets":
-        return construct_call("st_supabase", operation, ttl=params["ttl"])
-    if operation == "get_bucket":
-        return construct_call("st_supabase", operation, bucket, ttl=params["ttl"])
-    if operation == "create_bucket":
-        return construct_call(
-            "st_supabase",
+        call = construct_call("supabase.storage", operation)
+    elif operation == "get_bucket":
+        call = construct_call("supabase.storage", operation, bucket)
+    elif operation == "create_bucket":
+        call = construct_call(
+            "supabase.storage",
             operation,
             bucket,
             name=params["name"] or None,
-            file_size_limit=int(params["file_size_limit"]) or None,
-            allowed_mime_types=params["allowed_mime_types"] or None,
-            public=params["public"],
+            options={
+                "public": params["public"],
+                "file_size_limit": int(params["file_size_limit"]) or None,
+                "allowed_mime_types": params["allowed_mime_types"] or None,
+            },
         )
-    if operation == "update_bucket":
-        return construct_call(
-            "st_supabase",
+    elif operation == "update_bucket":
+        call = construct_call(
+            "supabase.storage",
             operation,
             bucket,
-            file_size_limit=int(params["file_size_limit"]) or None,
-            allowed_mime_types=params["allowed_mime_types"] or None,
-            public=params["public"],
+            options={
+                "public": params["public"],
+                "file_size_limit": int(params["file_size_limit"]) or None,
+                "allowed_mime_types": params["allowed_mime_types"] or None,
+            },
         )
-    if operation == "upload":
+    elif operation == "upload":
         destination = params["destination_path"] or params["file"].name
-        return (
+        call = (
             construct_call(
-                "st_supabase",
+                bucket_api,
                 operation,
-                bucket,
-                source="local",
-                file=literal("uploaded_file"),
-                destination_path=destination,
-                overwrite="true" if params["overwrite"] else "false",
+                path=destination.lstrip("/"),
+                file=literal("uploaded_file.getvalue()"),
+                file_options=literal(
+                    '{"content-type": uploaded_file.type or "application/octet-stream", '
+                    f'"upsert": {("true" if params["overwrite"] else "false")!r}}}'
+                ),
             )
             + "\n# uploaded_file is returned by st.file_uploader()."
         )
-    if operation == "move":
-        return construct_call(
-            "st_supabase",
+    elif operation == "move":
+        call = construct_call(
+            bucket_api,
             operation,
-            bucket,
             params["from_path"],
             params["to_path"],
         )
-    if operation == "remove":
-        return construct_call("st_supabase", operation, bucket, params["paths"])
-    if operation == "list_objects":
-        return construct_call(
-            "st_supabase",
-            operation,
-            bucket,
-            path=params["path"],
-            limit=int(params["limit"]),
-            offset=int(params["offset"]),
-            sortby=params["sortby"],
-            order="asc" if params["order"] == "Ascending" else "desc",
-            ttl=params["ttl"],
-        )
-    if operation == "download":
+    elif operation == "remove":
+        call = construct_call(bucket_api, operation, params["paths"])
+    elif operation == "list_objects":
         call = construct_call(
-            "st_supabase",
-            operation,
-            bucket,
-            source_path=params["source_path"],
-            ttl=params["ttl"],
+            bucket_api,
+            "list",
+            params["path"] or None,
+            {
+                "limit": int(params["limit"]),
+                "offset": int(params["offset"]),
+                "sortBy": {
+                    "column": params["sortby"],
+                    "order": "asc" if params["order"] == "Ascending" else "desc",
+                },
+            },
         )
-        return f"file_name, mime, data = {call}"
-    if operation == "get_public_url":
-        return construct_call(
-            "st_supabase",
+    elif operation == "download":
+        call = "data = " + construct_call(bucket_api, operation, params["source_path"])
+    elif operation == "get_public_url":
+        call = construct_call(bucket_api, operation, params["filepath"])
+    elif operation == "create_signed_urls":
+        call = construct_call(
+            bucket_api,
             operation,
-            bucket,
-            filepath=params["filepath"],
-            ttl=params["ttl"],
+            params["paths"],
+            int(params["expires_in"]),
         )
-    if operation == "create_signed_urls":
-        return construct_call(
-            "st_supabase",
+    elif operation == "create_signed_upload_url":
+        call = construct_call(
+            bucket_api,
             operation,
-            bucket,
-            paths=params["paths"],
-            expires_in=int(params["expires_in"]),
+            params["path"],
         )
-    if operation == "create_signed_upload_url":
-        return construct_call(
-            "st_supabase",
-            operation,
-            bucket,
-            path=params["path"],
-        )
-    if operation == "upload_to_signed_url":
-        return (
+    elif operation == "upload_to_signed_url":
+        call = (
             construct_call(
-                "st_supabase",
+                bucket_api,
                 operation,
-                bucket,
-                path=params["path"],
-                token=literal('"***"'),
-                file=literal("uploaded_file"),
+                params["path"],
+                literal('"***"'),
+                literal("uploaded_file.getvalue()"),
+                file_options=literal(
+                    '{"content-type": uploaded_file.type or "application/octet-stream"}'
+                ),
             )
             + "\n# uploaded_file is returned by st.file_uploader()."
         )
-    return construct_call("st_supabase", operation, bucket)
+    else:
+        call = construct_call("supabase.storage", operation, bucket)
+    return f"{SESSION_CLIENT_CODE}\n\n{call}"
 
 
 def _execute(
-    connection: Any,
+    storage: SessionStorage,
     operation: str,
     params: dict[str, Any],
     label: str,
@@ -542,7 +528,7 @@ def _execute(
     try:
         bucket = params.get("bucket_id")
         if operation == "list_buckets":
-            response = connection.list_buckets(ttl=params["ttl"])
+            response = storage.list_buckets()
             store_result(
                 SCOPE,
                 title=(
@@ -552,10 +538,10 @@ def _execute(
                 display="table",
             )
         elif operation == "get_bucket":
-            response = connection.get_bucket(bucket, ttl=params["ttl"])
+            response = storage.get_bucket(bucket)
             store_result(SCOPE, title="Bucket retrieved", data=response)
         elif operation == "create_bucket":
-            response = connection.create_bucket(
+            response = storage.create_bucket(
                 bucket,
                 name=params["name"] or None,
                 file_size_limit=int(params["file_size_limit"]) or None,
@@ -564,7 +550,7 @@ def _execute(
             )
             store_result(SCOPE, title=f"Bucket {bucket} created", data=response)
         elif operation == "update_bucket":
-            response = connection.update_bucket(
+            response = storage.update_bucket(
                 bucket,
                 file_size_limit=int(params["file_size_limit"]) or None,
                 allowed_mime_types=params["allowed_mime_types"] or None,
@@ -572,19 +558,18 @@ def _execute(
             )
             store_result(SCOPE, title=f"Bucket {bucket} updated", data=response)
         elif operation == "delete_bucket":
-            response = connection.delete_bucket(bucket)
+            response = storage.delete_bucket(bucket)
             store_result(SCOPE, title=f"Bucket {bucket} deleted", data=response)
         elif operation == "empty_bucket":
-            response = connection.empty_bucket(bucket)
+            response = storage.empty_bucket(bucket)
             store_result(SCOPE, title=f"Bucket {bucket} emptied", data=response)
         elif operation == "upload":
             destination = params["destination_path"] or params["file"].name
-            response = connection.upload(
+            response = storage.upload(
                 bucket,
-                "local",
                 params["file"],
                 destination,
-                "true" if params["overwrite"] else "false",
+                overwrite=params["overwrite"],
             )
             store_result(
                 SCOPE,
@@ -593,7 +578,7 @@ def _execute(
                 data=response,
             )
         elif operation == "move":
-            response = connection.move(
+            response = storage.move(
                 bucket,
                 params["from_path"],
                 params["to_path"],
@@ -605,21 +590,20 @@ def _execute(
                 data=response,
             )
         elif operation == "remove":
-            response = connection.remove(bucket, params["paths"])
+            response = storage.remove(bucket, params["paths"])
             store_result(
                 SCOPE,
                 title=f"Delete request completed for {len(params['paths'])} files",
                 data=response,
             )
         elif operation == "list_objects":
-            response = connection.list_objects(
+            response = storage.list_objects(
                 bucket,
                 path=params["path"],
                 limit=int(params["limit"]),
                 offset=int(params["offset"]),
                 sortby=params["sortby"],
                 order="asc" if params["order"] == "Ascending" else "desc",
-                ttl=params["ttl"],
             )
             store_result(
                 SCOPE,
@@ -630,10 +614,9 @@ def _execute(
                 display="table",
             )
         elif operation == "download":
-            file_name, mime, data = connection.download(
+            file_name, mime, data = storage.download(
                 bucket,
-                source_path=params["source_path"],
-                ttl=params["ttl"],
+                params["source_path"],
             )
             store_result(
                 SCOPE,
@@ -642,14 +625,13 @@ def _execute(
                 download={"data": data, "file_name": file_name, "mime": mime},
             )
         elif operation == "get_public_url":
-            response = connection.get_public_url(
+            response = storage.get_public_url(
                 bucket,
-                filepath=params["filepath"],
-                ttl=params["ttl"],
+                params["filepath"],
             )
             store_result(SCOPE, title="Public URL created", url=response)
         elif operation == "create_signed_urls":
-            response = connection.create_signed_urls(
+            response = storage.create_signed_urls(
                 bucket,
                 paths=params["paths"],
                 expires_in=int(params["expires_in"]),
@@ -664,7 +646,7 @@ def _execute(
                 display="table",
             )
         elif operation == "create_signed_upload_url":
-            response = connection.create_signed_upload_url(
+            response = storage.create_signed_upload_url(
                 bucket,
                 path=params["path"],
             )
@@ -675,7 +657,7 @@ def _execute(
                 data=response,
             )
         elif operation == "upload_to_signed_url":
-            response = connection.upload_to_signed_url(
+            response = storage.upload_to_signed_url(
                 bucket,
                 params["path"],
                 params["token"],
@@ -699,15 +681,7 @@ def _fingerprint_values(operation: str, params: dict[str, Any]) -> dict[str, Any
             "name": getattr(uploaded, "name", "uploaded-file"),
             "size": getattr(uploaded, "size", None),
         }
-    if "token" in values:
-        values["token"] = hashlib_sha256(values["token"])
     return {"operation": operation, **values}
-
-
-def hashlib_sha256(value: Any) -> str:
-    import hashlib
-
-    return hashlib.sha256(str(value).encode()).hexdigest()
 
 
 def _target(operation: str, params: dict[str, Any]) -> str:

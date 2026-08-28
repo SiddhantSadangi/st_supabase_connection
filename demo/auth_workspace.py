@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from typing import Any
 
 import streamlit as st
@@ -179,7 +178,7 @@ def _render_sign_up(auth_api: Any, project_label: str) -> None:
         f"{SCOPE}:sign_up",
         {
             "email": email.strip(),
-            "password": hashlib.sha256(password.encode()).hexdigest(),
+            "password": password,
             "first_name": first_name.strip(),
             "attribution": attribution.strip(),
         },
