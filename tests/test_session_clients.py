@@ -2,6 +2,8 @@ import base64
 import json
 import unittest
 
+from streamlit.errors import StreamlitSecretNotFoundError
+
 from demo.session_clients import (
     custom_connection_name,
     resolve_connection_credentials,
@@ -38,6 +40,21 @@ class SessionClientTests(unittest.TestCase):
         self.assertEqual(
             resolve_connection_credentials({}, environ),
             ("https://environment.supabase.co", "environment-key"),
+        )
+
+    def test_missing_secrets_file_falls_back_to_environment_credentials(self):
+        class MissingSecrets(dict):
+            def get(self, key, default=None):
+                raise StreamlitSecretNotFoundError("No secrets file exists.")
+
+        environ = {
+            "SUPABASE_URL": "https://environment.supabase.co",
+            "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_environment",
+        }
+
+        self.assertEqual(
+            resolve_connection_credentials(MissingSecrets(), environ),
+            ("https://environment.supabase.co", "sb_publishable_environment"),
         )
 
     def test_publishable_alias_takes_precedence_over_legacy_key_name(self):

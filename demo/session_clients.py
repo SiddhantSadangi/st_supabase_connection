@@ -10,6 +10,8 @@ from collections.abc import Mapping, MutableMapping
 from typing import Any
 from urllib.parse import urlparse
 
+from streamlit.errors import StreamlitSecretNotFoundError
+
 _CUSTOM_CONNECTION_TOKEN_STATE_KEY = "_supabase_custom_connection_token"
 
 
@@ -18,7 +20,7 @@ def _mapping_value(mapping: Mapping[str, Any] | None, key: str) -> Any:
         return None
     try:
         return mapping.get(key)
-    except (AttributeError, TypeError):
+    except (AttributeError, TypeError, StreamlitSecretNotFoundError):
         return None
 
 
