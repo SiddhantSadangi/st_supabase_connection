@@ -38,6 +38,9 @@ class FakeQuery:
     def eq(self, *args, **kwargs):
         return self._record("eq", *args, **kwargs)
 
+    def is_(self, *args, **kwargs):
+        return self._record("is_", *args, **kwargs)
+
     def order(self, *args, **kwargs):
         return self._record("order", *args, **kwargs)
 
@@ -94,7 +97,16 @@ class SafeExecutionTests(unittest.TestCase):
                 )
 
         filters = parse_filter_rows([{"Column": "deleted_at", "Operator": "Is", "Value": "null"}])
-        self.assertEqual(filters, [FilterSpec("deleted_at", "is_", None)])
+        self.assertEqual(filters, [FilterSpec("deleted_at", "is_", "null")])
+
+        client = FakeClient()
+        build_database_query(
+            client,
+            table="countries",
+            operation="select",
+            filters=filters,
+        )
+        self.assertIn(("is_", ("deleted_at", "null"), {}), client.query.calls)
 
         code = render_database_code(
             table="countries",
@@ -103,7 +115,7 @@ class SafeExecutionTests(unittest.TestCase):
             filters=filters,
         )
         ast.parse(code)
-        self.assertIn(".is_('deleted_at', None)", code)
+        self.assertIn(".is_('deleted_at', 'null')", code)
 
     def test_build_select_query_from_structured_values(self):
         client = FakeClient()

@@ -111,13 +111,13 @@ def parse_filter_rows(rows: Iterable[Mapping[str, Any]]) -> list[FilterSpec]:
                 f'Filter {index} needs a value. Enter null or "" explicitly if intended.'
             )
 
-        filters.append(
-            FilterSpec(
-                column=column,
-                method=FILTER_OPERATORS[operator_label],
-                value=parse_filter_value(raw_value),
-            )
-        )
+        method = FILTER_OPERATORS[operator_label]
+        parsed_value = parse_filter_value(raw_value)
+        if method == "is_" and parsed_value is None:
+            # postgrest-py expects the literal "null" for an `is.null` filter.
+            parsed_value = "null"
+
+        filters.append(FilterSpec(column=column, method=method, value=parsed_value))
     return filters
 
 
