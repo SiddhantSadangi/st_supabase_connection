@@ -58,6 +58,8 @@ def _get_or_create_session_client(
 def _query_hash(query: Any) -> str:
     """Hash a query without exposing credentials or sharing cached user data."""
     request = query.request
+    request_session = getattr(request, "session", None)
+    base_url = getattr(request_session, "base_url", "")
     headers = getattr(request, "headers", {})
     try:
         header_items = headers.items()
@@ -71,7 +73,8 @@ def _query_hash(query: Any) -> str:
             normalized_value = hashlib.sha256(normalized_value.encode()).hexdigest()
         normalized_headers.append((normalized_name, normalized_value))
     material = (
-        str(getattr(request, "method", "")),
+        str(getattr(request, "method", None) or getattr(request, "http_method", "")),
+        str(base_url),
         str(getattr(request, "url", "")),
         str(getattr(request, "path", "")),
         str(getattr(request, "params", "")),

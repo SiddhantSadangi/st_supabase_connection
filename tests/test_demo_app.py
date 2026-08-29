@@ -53,10 +53,20 @@ class FakeSessionClient:
 class FakeStorage:
     def __init__(self):
         self.list_buckets_calls = 0
+        self.bucket_settings = {
+            "bucket-a": {
+                "file_size_limit": 1024,
+                "allowed_mime_types": ["image/png"],
+                "public": True,
+            }
+        }
 
     def list_buckets(self):
         self.list_buckets_calls += 1
         return [{"id": "bucket1", "name": "bucket1", "public": True}]
+
+    def get_bucket(self, bucket_id):
+        return self.bucket_settings[bucket_id]
 
 
 class FakeConnection:
@@ -251,6 +261,25 @@ class DemoAppTests(unittest.TestCase):
             "Type RUN to confirm",
         )
         self.assertTrue(app.button(key="_ux_confirm_operation").disabled)
+
+    def test_storage_update_settings_reset_when_bucket_changes(self):
+        app, _connection = self.connected_app(project="custom")
+
+        app.segmented_control(key="storage_risk").set_value("Write").run()
+        app.selectbox(key="storage_operation_write").set_value("Update bucket").run()
+        app.text_input(key="storage_update_bucket_bucket").set_value("bucket-a").run()
+        app.button(key="storage_load_bucket").click().run()
+
+        self.assertEqual(app.number_input(key="storage_update_size").value, 1024)
+        self.assertTrue(app.checkbox(key="storage_update_public").value)
+        self.assertEqual(app.multiselect(key="storage_update_mime").value, ["image/png"])
+
+        app.text_input(key="storage_update_bucket_bucket").set_value("bucket-b").run()
+
+        self.assert_no_exceptions(app)
+        self.assertEqual(app.number_input(key="storage_update_size").value, 0)
+        self.assertFalse(app.checkbox(key="storage_update_public").value)
+        self.assertEqual(app.multiselect(key="storage_update_mime").value, [])
 
     def test_custom_database_delete_requires_a_filter(self):
         app, _connection = self.connected_app(project="custom", workspace="Database")

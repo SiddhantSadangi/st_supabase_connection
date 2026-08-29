@@ -23,6 +23,12 @@ from ui_helpers import (
 SCOPE = "storage"
 SESSION_CLIENT_CODE = "supabase = st_supabase.session_client()"
 _PRESERVE_RESULT_ONCE_STATE_KEY = "_storage_preserve_result_once"
+_UPDATE_BUCKET_STATE_KEY = "_storage_update_bucket_id"
+_UPDATE_BUCKET_WIDGET_KEYS = (
+    "storage_update_size",
+    "storage_update_mime",
+    "storage_update_public",
+)
 DEMO_OBJECTS = {
     "bucket1": ["awesome_zoom_background.jpg"],
     "bucket2": ["folder1/folder2/lenna.png"],
@@ -189,6 +195,7 @@ def _render_inputs(
 
     elif operation == "update_bucket":
         bucket_id = params["bucket_id"]
+        _sync_update_bucket_state(bucket_id)
         if st.button(
             "Load current settings",
             icon=":material/download:",
@@ -376,6 +383,15 @@ def _render_inputs(
         )
 
     return params, _validate(operation, params)
+
+
+def _sync_update_bucket_state(bucket_id: str) -> None:
+    """Reset update widgets before rendering when their target bucket changes."""
+    if st.session_state.get(_UPDATE_BUCKET_STATE_KEY) == bucket_id:
+        return
+    for key in _UPDATE_BUCKET_WIDGET_KEYS:
+        st.session_state.pop(key, None)
+    st.session_state[_UPDATE_BUCKET_STATE_KEY] = bucket_id
 
 
 def _validate(operation: str, params: dict[str, Any]) -> str | None:

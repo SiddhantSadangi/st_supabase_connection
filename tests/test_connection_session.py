@@ -184,14 +184,14 @@ class SessionClientLibraryTests(unittest.TestCase):
     def test_query_hash_is_scoped_by_authorization_and_project(self):
         def query(
             authorization,
-            url="https://demo.supabase.co/rest/v1/countries",
+            base_url="https://demo.supabase.co/rest/v1/",
             headers=None,
         ):
             return SimpleNamespace(
                 request=SimpleNamespace(
-                    method="GET",
-                    url=url,
-                    path="/rest/v1/countries",
+                    session=SimpleNamespace(base_url=base_url),
+                    http_method="GET",
+                    path="/countries",
                     params={"select": "*"},
                     json=None,
                     headers={"Authorization": authorization, **(headers or {})},
@@ -204,7 +204,7 @@ class SessionClientLibraryTests(unittest.TestCase):
         second_project = _query_hash(
             query(
                 "Bearer user-one-token",
-                url="https://other.supabase.co/rest/v1/countries",
+                base_url="https://other.supabase.co/rest/v1/",
             )
         )
 
@@ -212,6 +212,7 @@ class SessionClientLibraryTests(unittest.TestCase):
         self.assertNotEqual(first, second_user)
         self.assertNotEqual(first, second_project)
         self.assertNotIn("user-one-token", first)
+        self.assertNotIn("demo.supabase.co", first)
 
     def test_query_hash_includes_count_preference_and_api_key_scope(self):
         def query(headers):
