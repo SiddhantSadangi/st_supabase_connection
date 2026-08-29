@@ -119,9 +119,12 @@ def parse_filter_rows(rows: Iterable[Mapping[str, Any]]) -> list[FilterSpec]:
 
         method = FILTER_OPERATORS[operator_label]
         parsed_value = parse_filter_value(raw_value)
-        if method == "is_" and parsed_value is None:
-            # postgrest-py expects the literal "null" for an `is.null` filter.
-            parsed_value = "null"
+        if method == "is_":
+            # postgrest-py expects lowercase PostgREST literals for `is` filters.
+            if parsed_value is None:
+                parsed_value = "null"
+            elif isinstance(parsed_value, bool):
+                parsed_value = str(parsed_value).lower()
 
         filters.append(FilterSpec(column=column, method=method, value=parsed_value))
     return filters

@@ -131,6 +131,41 @@ class SafeExecutionTests(unittest.TestCase):
         ast.parse(code)
         self.assertIn(".is_('deleted_at', 'null')", code)
 
+    def test_is_filter_normalizes_boolean_literals(self):
+        filters = parse_filter_rows(
+            [
+                {"Column": "is_active", "Operator": "Is", "Value": "true"},
+                {"Column": "is_archived", "Operator": "Is", "Value": "false"},
+            ]
+        )
+        self.assertEqual(
+            filters,
+            [
+                FilterSpec("is_active", "is_", "true"),
+                FilterSpec("is_archived", "is_", "false"),
+            ],
+        )
+
+        client = FakeClient()
+        build_database_query(
+            client,
+            table="countries",
+            operation="select",
+            filters=filters,
+        )
+        self.assertIn(("is_", ("is_active", "true"), {}), client.query.calls)
+        self.assertIn(("is_", ("is_archived", "false"), {}), client.query.calls)
+
+        code = render_database_code(
+            table="countries",
+            operation="select",
+            ttl=0,
+            filters=filters,
+        )
+        ast.parse(code)
+        self.assertIn(".is_('is_active', 'true')", code)
+        self.assertIn(".is_('is_archived', 'false')", code)
+
     def test_build_select_query_from_structured_values(self):
         client = FakeClient()
         query = build_database_query(
