@@ -41,6 +41,9 @@ class FakeQuery:
     def is_(self, *args, **kwargs):
         return self._record("is_", *args, **kwargs)
 
+    def in_(self, *args, **kwargs):
+        return self._record("in_", *args, **kwargs)
+
     def order(self, *args, **kwargs):
         return self._record("order", *args, **kwargs)
 
@@ -165,6 +168,34 @@ class SafeExecutionTests(unittest.TestCase):
         ast.parse(code)
         self.assertIn(".is_('is_active', 'true')", code)
         self.assertIn(".is_('is_archived', 'false')", code)
+
+    def test_in_filter_requires_a_json_array(self):
+        for value in ("Asia", '"Asia"', "42", "true", '{"continent": "Asia"}'):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "JSON array"):
+                parse_filter_rows([{"Column": "continent", "Operator": "In", "Value": value}])
+
+        filters = parse_filter_rows(
+            [{"Column": "continent", "Operator": "In", "Value": '["Asia", "Europe"]'}]
+        )
+        self.assertEqual(filters, [FilterSpec("continent", "in_", ["Asia", "Europe"])])
+
+        client = FakeClient()
+        build_database_query(
+            client,
+            table="countries",
+            operation="select",
+            filters=filters,
+        )
+        self.assertIn(("in_", ("continent", ["Asia", "Europe"]), {}), client.query.calls)
+
+        code = render_database_code(
+            table="countries",
+            operation="select",
+            ttl=0,
+            filters=filters,
+        )
+        ast.parse(code)
+        self.assertIn(".in_('continent', ['Asia', 'Europe'])", code)
 
     def test_build_select_query_from_structured_values(self):
         client = FakeClient()

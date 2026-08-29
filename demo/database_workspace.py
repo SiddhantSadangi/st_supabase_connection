@@ -243,7 +243,10 @@ def _render_inputs(operation: str, project: str) -> tuple[dict[str, Any], str | 
                 ),
                 "Value": st.column_config.TextColumn(
                     "Value",
-                    help='Plain text or JSON, such as 42, true, null, or ["a", "b"].',
+                    help=(
+                        'Plain text or JSON, such as 42, true, null, or ["a", "b"]. '
+                        "In requires a JSON array."
+                    ),
                 ),
             },
             key=f"database_filters_{operation}_{params['table']}",

@@ -125,6 +125,8 @@ def parse_filter_rows(rows: Iterable[Mapping[str, Any]]) -> list[FilterSpec]:
                 parsed_value = "null"
             elif isinstance(parsed_value, bool):
                 parsed_value = str(parsed_value).lower()
+        elif method == "in_" and not isinstance(parsed_value, list):
+            raise ValueError(f"Filter {index} with In needs a JSON array value.")
 
         filters.append(FilterSpec(column=column, method=method, value=parsed_value))
     return filters
