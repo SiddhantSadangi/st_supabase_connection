@@ -58,8 +58,10 @@ def _get_or_create_session_client(
 def _query_hash(query: Any) -> str:
     """Hash a query without exposing credentials or sharing cached user data."""
     request = query.request
-    request_session = getattr(request, "session", None)
-    base_url = getattr(request_session, "base_url", "")
+    query_session = getattr(query, "session", None)
+    if query_session is None:
+        query_session = getattr(request, "session", None)
+    base_url = getattr(query_session, "base_url", "")
     headers = getattr(request, "headers", {})
     try:
         header_items = headers.items()

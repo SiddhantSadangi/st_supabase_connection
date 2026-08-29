@@ -188,14 +188,14 @@ class SessionClientLibraryTests(unittest.TestCase):
             headers=None,
         ):
             return SimpleNamespace(
+                session=SimpleNamespace(base_url=base_url),
                 request=SimpleNamespace(
-                    session=SimpleNamespace(base_url=base_url),
                     http_method="GET",
                     path="/countries",
                     params={"select": "*"},
                     json=None,
                     headers={"Authorization": authorization, **(headers or {})},
-                )
+                ),
             )
 
         first = _query_hash(query("Bearer user-one-token"))
@@ -207,8 +207,12 @@ class SessionClientLibraryTests(unittest.TestCase):
                 base_url="https://other.supabase.co/rest/v1/",
             )
         )
+        request_session_query = query("Bearer user-one-token")
+        request_session_query.request.session = request_session_query.session
+        del request_session_query.session
 
         self.assertEqual(first, same)
+        self.assertEqual(first, _query_hash(request_session_query))
         self.assertNotEqual(first, second_user)
         self.assertNotEqual(first, second_project)
         self.assertNotIn("user-one-token", first)
