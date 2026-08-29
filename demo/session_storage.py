@@ -53,14 +53,12 @@ class SessionStorage:
         self,
         bucket_id: str,
         *,
-        name: str | None,
         public: bool,
         file_size_limit: int | None,
         allowed_mime_types: list[str] | None,
     ) -> Any:
         return self._storage.create_bucket(
             bucket_id,
-            name=name,
             options={
                 "public": public,
                 "file_size_limit": file_size_limit,

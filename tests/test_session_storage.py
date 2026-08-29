@@ -4,12 +4,12 @@ import unittest
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 DEMO_PATH = Path(__file__).parents[1] / "demo"
 sys.path.insert(0, str(DEMO_PATH))
 
-from storage_workspace import _render_code
+import storage_workspace
 
 from demo.session_storage import SessionStorage
 
@@ -31,7 +31,6 @@ class SessionStorageTests(unittest.TestCase):
         self.storage.get_bucket("private")
         self.storage.create_bucket(
             "private",
-            name=None,
             public=False,
             file_size_limit=None,
             allowed_mime_types=["image/png"],
@@ -49,7 +48,6 @@ class SessionStorageTests(unittest.TestCase):
         self.storage_api.get_bucket.assert_called_once_with("private")
         self.storage_api.create_bucket.assert_called_once_with(
             "private",
-            name=None,
             options={
                 "public": False,
                 "file_size_limit": None,
@@ -135,7 +133,6 @@ class SessionStorageTests(unittest.TestCase):
             "get_bucket": {"bucket_id": "private"},
             "create_bucket": {
                 "bucket_id": "private",
-                "name": "",
                 "file_size_limit": 0,
                 "allowed_mime_types": [],
                 "public": False,
@@ -177,9 +174,48 @@ class SessionStorageTests(unittest.TestCase):
 
         for operation, params in cases.items():
             with self.subTest(operation=operation):
-                code = _render_code(operation, params)
+                code = storage_workspace._render_code(operation, params)
                 ast.parse(code)
                 self.assertIn("st_supabase.session_client()", code)
+
+    def test_secret_cleanup_preserves_result_for_exactly_one_rerun(self):
+        state = {storage_workspace._PRESERVE_RESULT_ONCE_STATE_KEY: True}
+
+        with (
+            patch.object(storage_workspace.st, "session_state", state),
+            patch.object(storage_workspace, "sync_result_context") as sync_context,
+        ):
+            storage_workspace._sync_storage_result_context("updated-action")
+            sync_context.assert_not_called()
+
+            storage_workspace._sync_storage_result_context("updated-action")
+            sync_context.assert_called_once_with("storage", "updated-action")
+
+    def test_signed_upload_marks_its_result_for_the_secret_cleanup_rerun(self):
+        state = {}
+        self.storage.upload_to_signed_url = MagicMock(return_value={"path": "avatar.png"})
+        params = {
+            "bucket_id": "private",
+            "path": "avatar.png",
+            "token": "signed-token",
+            "file": UploadedFile(b"image-bytes"),
+        }
+
+        with (
+            patch.object(storage_workspace.st, "session_state", state),
+            patch.object(storage_workspace.st, "rerun") as rerun,
+        ):
+            storage_workspace._execute(
+                self.storage,
+                "upload_to_signed_url",
+                params,
+                "Upload with signed URL",
+            )
+
+        self.assertTrue(state[storage_workspace._PRESERVE_RESULT_ONCE_STATE_KEY])
+        self.assertTrue(state["_clear_storage_secret_fields"])
+        self.assertEqual(state["_ux_result_storage"]["status"], "success")
+        rerun.assert_called_once_with()
 
 
 if __name__ == "__main__":

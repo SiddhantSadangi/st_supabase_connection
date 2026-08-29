@@ -22,6 +22,7 @@ from ui_helpers import (
 
 SCOPE = "storage"
 SESSION_CLIENT_CODE = "supabase = st_supabase.session_client()"
+_PRESERVE_RESULT_ONCE_STATE_KEY = "_storage_preserve_result_once"
 DEMO_OBJECTS = {
     "bucket1": ["awesome_zoom_background.jpg"],
     "bucket2": ["folder1/folder2/lenna.png"],
@@ -101,7 +102,7 @@ def render_storage_workspace(connection: Any, *, project: str, project_label: st
 
     action_values = _fingerprint_values(operation, params)
     action_id = action_fingerprint(f"{SCOPE}:{operation}", action_values)
-    sync_result_context(SCOPE, action_id)
+    _sync_storage_result_context(action_id)
     confirmed = consume_confirmation(SCOPE, action_id)
 
     if risk == "Read":
@@ -166,13 +167,7 @@ def _render_inputs(
             ).strip()
 
     if operation == "create_bucket":
-        left, right = st.columns(2)
-        params["name"] = left.text_input(
-            "Bucket name",
-            key="storage_create_name",
-            help="Optional. The bucket ID is used when left blank.",
-        ).strip()
-        params["file_size_limit"] = right.number_input(
+        params["file_size_limit"] = st.number_input(
             "File size limit (bytes)",
             min_value=0,
             value=0,
@@ -426,7 +421,6 @@ def _render_code(operation: str, params: dict[str, Any]) -> str:
             "supabase.storage",
             operation,
             bucket,
-            name=params["name"] or None,
             options={
                 "public": params["public"],
                 "file_size_limit": int(params["file_size_limit"]) or None,
@@ -543,7 +537,6 @@ def _execute(
         elif operation == "create_bucket":
             response = storage.create_bucket(
                 bucket,
-                name=params["name"] or None,
                 file_size_limit=int(params["file_size_limit"]) or None,
                 allowed_mime_types=params["allowed_mime_types"] or None,
                 public=params["public"],
@@ -669,8 +662,16 @@ def _execute(
     except Exception as exc:
         store_error(SCOPE, exc, context=label)
     if operation == "upload_to_signed_url":
+        st.session_state[_PRESERVE_RESULT_ONCE_STATE_KEY] = True
         st.session_state["_clear_storage_secret_fields"] = True
         st.rerun()
+
+
+def _sync_storage_result_context(action_id: str) -> None:
+    """Keep a signed-upload result through its one secret-cleanup rerun."""
+    if st.session_state.pop(_PRESERVE_RESULT_ONCE_STATE_KEY, False):
+        return
+    sync_result_context(SCOPE, action_id)
 
 
 def _fingerprint_values(operation: str, params: dict[str, Any]) -> dict[str, Any]:
