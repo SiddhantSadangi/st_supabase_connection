@@ -7,6 +7,7 @@ from unittest.mock import patch
 from streamlit.testing.v1 import AppTest
 
 APP_PATH = Path(__file__).parents[1] / "demo" / "app.py"
+DEMO_REQUIREMENTS_PATH = APP_PATH.with_name("requirements.txt")
 
 
 class FakeAuth:
@@ -81,6 +82,21 @@ class FakeConnection:
 
 
 class DemoAppTests(unittest.TestCase):
+    def test_demo_installs_the_checked_out_library(self):
+        requirements = {
+            line.strip()
+            for line in DEMO_REQUIREMENTS_PATH.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+
+        self.assertIn("-e .", requirements)
+        self.assertFalse(
+            any(
+                line.startswith(("st_supabase_connection", "st-supabase-connection"))
+                for line in requirements
+            )
+        )
+
     def assert_no_exceptions(self, app):
         self.assertEqual([str(item.value) for item in app.exception], [])
 
