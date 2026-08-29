@@ -1,3 +1,5 @@
+import ast
+import math
 import unittest
 
 from demo.safe_execution import (
@@ -74,6 +76,34 @@ class SafeExecutionTests(unittest.TestCase):
         source = "__import__('os').system('echo unsafe')"
         filters = parse_filter_rows([{"Column": "name", "Operator": "Equals", "Value": source}])
         self.assertEqual(filters, [FilterSpec("name", "eq", source)])
+
+    def test_filter_rows_require_explicit_missing_values(self):
+        for missing_value in (None, math.nan, ""):
+            with (
+                self.subTest(missing_value=missing_value),
+                self.assertRaisesRegex(ValueError, "needs a value"),
+            ):
+                parse_filter_rows(
+                    [
+                        {
+                            "Column": "deleted_at",
+                            "Operator": "Is",
+                            "Value": missing_value,
+                        }
+                    ]
+                )
+
+        filters = parse_filter_rows([{"Column": "deleted_at", "Operator": "Is", "Value": "null"}])
+        self.assertEqual(filters, [FilterSpec("deleted_at", "is_", None)])
+
+        code = render_database_code(
+            table="countries",
+            operation="select",
+            ttl=0,
+            filters=filters,
+        )
+        ast.parse(code)
+        self.assertIn(".is_('deleted_at', None)", code)
 
     def test_build_select_query_from_structured_values(self):
         client = FakeClient()

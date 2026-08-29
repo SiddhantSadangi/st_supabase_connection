@@ -79,12 +79,12 @@ def parse_string_list(
 
 def parse_filter_value(value: Any) -> Any:
     """Parse JSON scalars/arrays while treating other input as plain text."""
+    if not _as_text(value).strip():
+        return ""
     if not isinstance(value, str):
         return value
 
     stripped = value.strip()
-    if not stripped:
-        return ""
     try:
         return json.loads(stripped)
     except json.JSONDecodeError:
@@ -98,13 +98,18 @@ def parse_filter_rows(rows: Iterable[Mapping[str, Any]]) -> list[FilterSpec]:
         column = _as_text(row.get("Column")).strip()
         operator_label = _as_text(row.get("Operator")).strip()
         raw_value = row.get("Value", "")
+        value_text = _as_text(raw_value).strip()
 
-        if not column and not operator_label and not _as_text(raw_value).strip():
+        if not column and not operator_label and not value_text:
             continue
         if not column:
             raise ValueError(f"Filter {index} needs a column name.")
         if operator_label not in FILTER_OPERATORS:
             raise ValueError(f"Filter {index} has an unsupported operator.")
+        if not value_text:
+            raise ValueError(
+                f'Filter {index} needs a value. Enter null or "" explicitly if intended.'
+            )
 
         filters.append(
             FilterSpec(
