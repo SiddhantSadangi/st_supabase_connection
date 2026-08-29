@@ -69,6 +69,20 @@ class SafeExecutionTests(unittest.TestCase):
             [{"name": "Wakanda"}],
         )
 
+    def test_database_inputs_reject_non_finite_json_constants(self):
+        for constant in ("NaN", "Infinity", "-Infinity"):
+            with (
+                self.subTest(payload_constant=constant),
+                self.assertRaisesRegex(ValueError, "finite numbers"),
+            ):
+                parse_json_records(f'{{"value": {constant}}}')
+
+            with (
+                self.subTest(filter_constant=constant),
+                self.assertRaisesRegex(ValueError, "finite numbers"),
+            ):
+                parse_filter_rows([{"Column": "value", "Operator": "Equals", "Value": constant}])
+
     def test_string_list_requires_json_strings(self):
         self.assertEqual(parse_string_list('["a", "b"]', field_name="Paths"), ["a", "b"])
         self.assertIsNone(parse_string_list("[]", field_name="Allowed MIME types", optional=True))

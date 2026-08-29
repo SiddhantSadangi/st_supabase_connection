@@ -37,10 +37,14 @@ class FilterSpec:
     value: Any
 
 
+def _reject_non_finite_json_constant(constant: str) -> None:
+    raise ValueError(f"JSON values must use finite numbers; {constant} is not supported.")
+
+
 def parse_json_records(value: str) -> dict[str, Any] | list[dict[str, Any]]:
     """Parse a database mutation payload without evaluating Python code."""
     try:
-        parsed = json.loads(value)
+        parsed = json.loads(value, parse_constant=_reject_non_finite_json_constant)
     except json.JSONDecodeError as exc:
         raise ValueError("Rows must be valid JSON.") from exc
 
@@ -82,11 +86,13 @@ def parse_filter_value(value: Any) -> Any:
     if not _as_text(value).strip():
         return ""
     if not isinstance(value, str):
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError("Filter values must use finite numbers.")
         return value
 
     stripped = value.strip()
     try:
-        return json.loads(stripped)
+        return json.loads(stripped, parse_constant=_reject_non_finite_json_constant)
     except json.JSONDecodeError:
         return value
 
