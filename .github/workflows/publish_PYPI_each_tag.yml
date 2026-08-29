@@ -1,34 +1,111 @@
-
-# This workflows will upload a Python Package using Twine when a release is created
-# For more information see: https://help.github.com/en/actions/language-and-framework-guides/using-python-with-github-actions#publishing-to-package-registries
-
-name: Upload Python Package
-permissions:
-  contents: read
+name: Publish Python package
 
 on:
   release:
-    types: [created]
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
+    name: Test and build distributions
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python
-        uses: actions/setup-python@v2
+      - name: Check out the repository
+        uses: actions/checkout@v7
         with:
-          python-version: "3.x"
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install setuptools wheel twine
-      - name: Build and publish
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Install build and test dependencies
+        run: >-
+          python -m pip install --upgrade pip build twine
+          --editable . streamlit-extras
+
+      - name: Run library and demo tests
+        run: python -m unittest discover --start-directory tests --verbose
+
+      - name: Verify the release tag matches the package version
+        if: github.event_name == 'release'
         env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: >-
+          python -c "import os; from st_supabase_connection import __version__;
+          tag = os.environ['RELEASE_TAG']; expected = tag[1:] if tag.startswith('v') else tag;
+          assert expected == __version__,
+          f'Release tag {tag!r} does not match package version {__version__!r}'"
+
+      - name: Build wheel and source distribution
+        run: python -m build
+
+      - name: Validate distribution metadata
+        run: python -m twine check dist/*
+
+      - name: Install and smoke-test the built wheel
         run: |
-          pwd
-          python setup.py sdist bdist_wheel
-          twine upload dist/*
+          python -m pip install --force-reinstall dist/*.whl
+          cd "${RUNNER_TEMP}"
+          python -c "import importlib.metadata as metadata; import st_supabase_connection as package; from st_supabase_connection import SupabaseConnection, execute_query; assert metadata.version('st-supabase-connection') == package.__version__; print(f'Installed st-supabase-connection {package.__version__}')"
+
+      - name: Store distributions for the publishing job
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-package-distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/st-supabase-connection
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v8
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish distributions to TestPyPI
+        uses: pypa/gh-action-pypi-publish@v1.12.3
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    name: Publish to PyPI
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/st-supabase-connection
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v8
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.12.3

@@ -21,12 +21,14 @@ repos:
   - id: black
     args:
     - --line-length=100
+    - --workers=1
 
 - repo: https://github.com/sourcery-ai/sourcery
   rev: v1.36.0
   hooks:
   - id: sourcery
-    # The best way to use Sourcery in a pre-commit hook:
-    # * review only changed lines:
-    # * omit the summary
-    args: [--diff=git diff HEAD, --no-summary]
+    # Sourcery suggestions are advisory and may return a non-zero status when
+    # refactors are available. Run them explicitly with:
+    # pre-commit run --hook-stage manual sourcery --all-files
+    stages: [manual]
+    args: [--no-summary]

@@ -1,12 +1,10 @@
 [theme]
 base="dark"
-primaryColor="#33986a"
-backgroundColor="#000000"
-secondaryBackgroundColor="#45164f"
-
-[server]
-enableXsrfProtection = false
-enableCORS = false
+primaryColor="#237A57"
+backgroundColor="#0E1117"
+secondaryBackgroundColor="#171B22"
+textColor="#F7F7F7"
+font="sans-serif"
 
 [client]
 toolbarMode = "minimal"
