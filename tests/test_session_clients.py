@@ -140,10 +140,21 @@ class SessionClientTests(unittest.TestCase):
         self.assertEqual(validate_project_url(""), "Enter your Supabase project URL.")
         self.assertIsNone(validate_project_url("https://demo.supabase.co"))
         self.assertIsNone(validate_project_url("http://127.0.0.1:54321"))
+        self.assertIsNone(validate_project_url("http://[::1]:54321"))
         self.assertEqual(
             validate_project_url("http://demo.supabase.co"),
             "Hosted Supabase projects must use HTTPS.",
         )
+        for malformed_url in (
+            "https://[",
+            "https://[abc]",
+            "https://demo.supabase.co:not-a-port",
+        ):
+            with self.subTest(malformed_url=malformed_url):
+                self.assertEqual(
+                    validate_project_url(malformed_url),
+                    "Enter a complete URL, such as https://project.supabase.co.",
+                )
 
     def test_public_key_validation_accepts_only_public_credentials(self):
         self.assertIsNone(validate_public_api_key("sb_publishable_example"))

@@ -85,12 +85,18 @@ def validate_project_url(url: str) -> str | None:
     if not normalized:
         return "Enter your Supabase project URL."
 
-    parsed = urlparse(normalized)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+    try:
+        parsed = urlparse(normalized)
+        hostname = parsed.hostname
+        _ = parsed.port
+    except ValueError:
+        return "Enter a complete URL, such as https://project.supabase.co."
+
+    if parsed.scheme not in {"http", "https"} or not hostname:
         return "Enter a complete URL, such as https://project.supabase.co."
 
     local_hosts = {"localhost", "127.0.0.1", "::1"}
-    if parsed.scheme != "https" and parsed.hostname not in local_hosts:
+    if parsed.scheme != "https" and hostname not in local_hosts:
         return "Hosted Supabase projects must use HTTPS."
     return None
 
