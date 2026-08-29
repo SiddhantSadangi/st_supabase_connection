@@ -110,6 +110,8 @@ def _legacy_key_role(key: str) -> str | None:
         value = json.loads(decoded)
     except (IndexError, ValueError, UnicodeDecodeError, json.JSONDecodeError):
         return None
+    if not isinstance(value, Mapping):
+        return None
     role = value.get("role")
     return role if isinstance(role, str) else None
 

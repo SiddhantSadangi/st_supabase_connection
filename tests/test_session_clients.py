@@ -167,10 +167,20 @@ class SessionClientTests(unittest.TestCase):
             validate_public_api_key(self._legacy_key("service_role")),
             "Service-role keys are not accepted. Use a publishable key instead.",
         )
+        for payload in ([], None, "anon"):
+            with self.subTest(payload=payload):
+                self.assertEqual(
+                    validate_public_api_key(self._legacy_key_payload(payload)),
+                    "Enter an sb_publishable_ key or a legacy anon key.",
+                )
 
     @staticmethod
     def _legacy_key(role):
-        payload = base64.urlsafe_b64encode(json.dumps({"role": role}).encode()).decode().rstrip("=")
+        return SessionClientTests._legacy_key_payload({"role": role})
+
+    @staticmethod
+    def _legacy_key_payload(value):
+        payload = base64.urlsafe_b64encode(json.dumps(value).encode()).decode().rstrip("=")
         return f"header.{payload}.signature"
 
 
