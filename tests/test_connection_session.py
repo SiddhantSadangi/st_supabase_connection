@@ -187,14 +187,21 @@ class SessionClientLibraryTests(unittest.TestCase):
             base_url="https://demo.supabase.co/rest/v1/",
             headers=None,
         ):
+            session = SimpleNamespace(
+                base_url=base_url,
+                headers={
+                    "Authorization": authorization,
+                    "apikey": "sb_publishable_shared",
+                },
+            )
             return SimpleNamespace(
-                session=SimpleNamespace(base_url=base_url),
+                session=session,
                 request=SimpleNamespace(
                     http_method="GET",
                     path="/countries",
                     params={"select": "*"},
                     json=None,
-                    headers={"Authorization": authorization, **(headers or {})},
+                    headers=headers or {},
                 ),
             )
 

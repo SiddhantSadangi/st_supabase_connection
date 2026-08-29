@@ -62,18 +62,21 @@ def _query_hash(query: Any) -> str:
     if query_session is None:
         query_session = getattr(request, "session", None)
     base_url = getattr(query_session, "base_url", "")
-    headers = getattr(request, "headers", {})
-    try:
-        header_items = headers.items()
-    except AttributeError:
-        header_items = ()
-    normalized_headers = []
-    for name, value in header_items:
-        normalized_name = str(name).lower()
-        normalized_value = str(value)
-        if normalized_name in {"authorization", "apikey"}:
-            normalized_value = hashlib.sha256(normalized_value.encode()).hexdigest()
-        normalized_headers.append((normalized_name, normalized_value))
+    normalized_headers = {}
+    for headers in (
+        getattr(query_session, "headers", {}),
+        getattr(request, "headers", {}),
+    ):
+        try:
+            header_items = headers.items()
+        except AttributeError:
+            header_items = ()
+        for name, value in header_items:
+            normalized_name = str(name).lower()
+            normalized_value = str(value)
+            if normalized_name in {"authorization", "apikey"}:
+                normalized_value = hashlib.sha256(normalized_value.encode()).hexdigest()
+            normalized_headers[normalized_name] = normalized_value
     material = (
         str(getattr(request, "method", None) or getattr(request, "http_method", "")),
         str(base_url),
@@ -81,7 +84,7 @@ def _query_hash(query: Any) -> str:
         str(getattr(request, "path", "")),
         str(getattr(request, "params", "")),
         str(getattr(request, "json", None) or {}),
-        tuple(sorted(normalized_headers)),
+        tuple(sorted(normalized_headers.items())),
     )
     return hashlib.sha256(repr(material).encode()).hexdigest()
 
