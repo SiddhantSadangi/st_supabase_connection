@@ -77,6 +77,7 @@ def render_database_workspace(
             "Operation type",
             options=list(OPERATION_GROUPS),
             default="Read",
+            required=True,
             key="database_risk",
         )
 
@@ -272,6 +273,7 @@ def _render_inputs(operation: str, project: str) -> tuple[dict[str, Any], str | 
                 "Direction",
                 options=["Ascending", "Descending"],
                 default="Ascending",
+                required=True,
                 key="database_order_direction",
             )
             params["order_desc"] = direction == "Descending"
@@ -291,6 +293,7 @@ def _render_inputs(operation: str, project: str) -> tuple[dict[str, Any], str | 
             "Result format",
             options=["Table", "JSON"],
             default="Table",
+            required=True,
             key="database_result_format",
         )
     else:

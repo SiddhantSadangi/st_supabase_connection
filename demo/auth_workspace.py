@@ -59,6 +59,7 @@ def render_auth_workspace(
             "Authentication task",
             options=["Sign in", "Create account", "Email OTP"],
             default="Sign in",
+            required=True,
             key="auth_mode",
         )
 
@@ -98,19 +99,21 @@ def _render_password_sign_in(auth_api: Any) -> None:
             type="primary",
             icon=":material/login:",
             width="stretch",
-            disabled=validation_error is not None,
-            help=validation_error,
         )
+
+    if validation_error:
+        if submitted:
+            clear_result(SCOPE)
+            st.error(validation_error)
+        return
 
     normalized = identifier.strip()
     identifier_field = "email" if "@" in normalized else "phone"
     request = {identifier_field: normalized, "password": password}
-    if validation_error is None:
-        render_code_preview(
-            f"{SESSION_CLIENT_CODE}\n\n"
-            f"supabase.auth.sign_in_with_password("
-            f"{dict(request, password='***')!r})"
-        )
+    render_code_preview(
+        f"{SESSION_CLIENT_CODE}\n\n"
+        f"supabase.auth.sign_in_with_password({dict(request, password='***')!r})"
+    )
 
     if submitted:
         clear_result(SCOPE)
@@ -143,49 +146,28 @@ def _render_sign_up(auth_api: Any, project_label: str) -> None:
             autocomplete="new-password",
             help="Use at least 6 characters.",
         )
-        first_name = left.text_input(
-            "First name",
-            key="auth_signup_first_name",
-            placeholder="Optional",
-        )
-        attribution = right.text_input(
-            "How did you hear about this library?",
-            key="auth_signup_attribution",
-            placeholder="Optional",
-        )
         validation_error = validate_sign_up(email, password)
         submitted = st.form_submit_button(
             "Review account creation",
             type="primary",
             icon=":material/rate_review:",
             width="stretch",
-            disabled=validation_error is not None,
-            help=validation_error,
         )
+
+    if validation_error:
+        if submitted:
+            clear_result(SCOPE)
+            st.error(validation_error)
+        return
 
     request = {
         "email": email.strip(),
         "password": password,
-        "options": {
-            "data": {
-                "fname": first_name.strip(),
-                "attribution": attribution.strip(),
-            }
-        },
     }
     code = f"{SESSION_CLIENT_CODE}\n\n" f"supabase.auth.sign_up({dict(request, password='***')!r})"
-    action_id = action_fingerprint(
-        f"{SCOPE}:sign_up",
-        {
-            "email": email.strip(),
-            "password": password,
-            "first_name": first_name.strip(),
-            "attribution": attribution.strip(),
-        },
-    )
+    action_id = action_fingerprint(f"{SCOPE}:sign_up", request)
 
-    if validation_error is None:
-        render_code_preview(code)
+    render_code_preview(code)
     if submitted:
         open_confirmation(
             scope=SCOPE,
@@ -225,7 +207,6 @@ def _render_otp(auth_api: Any) -> None:
         icon=":material/mail:",
     )
 
-    sent_to = st.session_state.get("auth_otp_sent_to")
     with st.form("auth_send_otp"):
         email = st.text_input(
             "Email",
@@ -238,8 +219,6 @@ def _render_otp(auth_api: Any) -> None:
             type="primary",
             icon=":material/send:",
             width="stretch",
-            disabled=email_error is not None,
-            help=email_error,
         )
 
     send_request = {
@@ -251,7 +230,10 @@ def _render_otp(auth_api: Any) -> None:
             f"{SESSION_CLIENT_CODE}\n\n" f"supabase.auth.sign_in_with_otp({send_request!r})"
         )
 
-    if sent:
+    if sent and email_error:
+        clear_result(SCOPE)
+        st.error(email_error)
+    if sent and email_error is None:
         clear_result(SCOPE)
         try:
             auth_api.sign_in_with_otp(send_request)
@@ -287,17 +269,20 @@ def _render_otp(auth_api: Any) -> None:
             type="primary",
             icon=":material/verified_user:",
             width="stretch",
-            disabled=token_error is not None,
-            help=token_error,
         )
 
-    if token_error is None:
-        render_code_preview(
-            f"{SESSION_CLIENT_CODE}\n\n"
-            "supabase.auth.verify_otp({"
-            f"'email': {sent_to!r}, 'token': '***', 'type': 'email'"
-            "})"
-        )
+    if token_error:
+        if verified:
+            clear_result(SCOPE)
+            st.error(token_error)
+        return
+
+    render_code_preview(
+        f"{SESSION_CLIENT_CODE}\n\n"
+        "supabase.auth.verify_otp({"
+        f"'email': {sent_to!r}, 'token': '***', 'type': 'email'"
+        "})"
+    )
     if verified:
         clear_result(SCOPE)
         try:

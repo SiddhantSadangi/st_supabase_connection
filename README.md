@@ -116,7 +116,7 @@ countries = execute_query(
 st.dataframe(countries.data)
 ```
 
-Do not cache Auth calls. For inserts, updates, upserts, and deletes, call Supabase's `.execute()` directly or pass `ttl=0` to `execute_query()`.
+Do not cache Auth calls. Starting in 2.2.1, `execute_query()` automatically bypasses caching for inserts, updates, upserts, deletes, and POST-based RPC calls. Direct `.execute()` calls also remain supported; `ttl=0` fetches fresh data for reads.
 
 See the [caching guide](https://github.com/SiddhantSadangi/st_supabase_connection/blob/main/docs/caching.md) for cache scope, user-specific queries, and invalidation considerations.
 
@@ -199,7 +199,15 @@ The connection includes Streamlit-friendly wrappers for commonly used Storage op
 
 Because `session_client()` returns the complete Supabase Python client, it can also be used for Functions, Realtime, and other SDK features that must carry the current user's session.
 
-## Upgrading to 2.2.0
+## Upgrading
+
+### 2.2.1
+
+This patch fixes Storage cache isolation between projects and credentials, prevents `execute_query()` from caching writes, and returns independent copies of cached read responses. No public methods are removed and dependency minimums are unchanged.
+
+`get_public_url()` now constructs URLs without caching; existing `ttl` arguments remain accepted but are ignored. Apps that manually clear cached results should use `st.cache_data.clear()`, not only `st.cache_resource.clear()`.
+
+### From 2.1.x to 2.2.x
 
 Version 2.2.0 requires Python 3.10+, Streamlit 1.62.0+, and Supabase Python 2.22.0+.
 
@@ -223,14 +231,29 @@ See the [2.2.0 changelog](https://github.com/SiddhantSadangi/st_supabase_connect
 
 ## Development
 
-Install the project and demo dependency, then run the library and demo tests:
+Install the project, then run the library and demo tests:
 
 ```bash
-python -m pip install --editable . streamlit-extras
+python -m pip install --editable .
 python -m unittest discover --start-directory tests --verbose
 ```
 
 The CI workflow tests Python 3.10–3.14 against the minimum and latest supported Streamlit releases.
+
+For the reproducible demo runtime, use **Python 3.12** and run from the repository root:
+
+```bash
+python -m pip install -r demo/requirements.txt
+python -m pip check
+python -m streamlit run demo/app.py
+```
+
+`demo/requirements.txt` pins the demo environment, including transitive dependencies;
+the published library keeps flexible dependency ranges. CI also tests this pinned set.
+Refresh the pins in a clean Python 3.12 environment when upgrading the demo, and run
+the suite plus the browser smoke checklist in [RELEASING.md](RELEASING.md).
+
+Black and isort use the repository's `pyproject.toml` settings.
 
 Issues and pull requests are welcome in the [GitHub repository](https://github.com/SiddhantSadangi/st_supabase_connection).
 

@@ -25,7 +25,6 @@ FILTER_OPERATORS = {
 }
 
 DATABASE_OPERATIONS = {"select", "insert", "upsert", "update", "delete"}
-FILTERED_OPERATIONS = {"select", "update", "delete"}
 
 
 @dataclass(frozen=True)
@@ -53,32 +52,6 @@ def parse_json_records(value: str) -> dict[str, Any] | list[dict[str, Any]]:
     if isinstance(parsed, list) and parsed and all(isinstance(row, dict) for row in parsed):
         return parsed
     raise ValueError("Rows must be a JSON object or a non-empty array of JSON objects.")
-
-
-def parse_string_list(
-    value: str | None,
-    *,
-    field_name: str,
-    optional: bool = False,
-) -> list[str] | None:
-    """Parse a JSON array of non-empty strings."""
-    if value is None or not value.strip():
-        if optional:
-            return None
-        raise ValueError(f"{field_name} is required.")
-
-    try:
-        parsed = json.loads(value)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"{field_name} must be a valid JSON array of strings.") from exc
-
-    if optional and parsed == []:
-        return None
-    if not isinstance(parsed, list) or not parsed:
-        raise ValueError(f"{field_name} must be a non-empty JSON array of strings.")
-    if not all(isinstance(item, str) and item.strip() for item in parsed):
-        raise ValueError(f"Every item in {field_name} must be a non-empty string.")
-    return parsed
 
 
 def parse_filter_value(value: Any) -> Any:
@@ -132,8 +105,7 @@ def parse_filter_rows(rows: Iterable[Mapping[str, Any]]) -> list[FilterSpec]:
     return filters
 
 
-def build_database_query(
-    client: Any,
+def _database_query_calls(
     *,
     table: str,
     operation: str,
@@ -146,105 +118,68 @@ def build_database_query(
     order_column: str | None = None,
     order_desc: bool = False,
     limit: int | None = None,
-) -> Any:
-    """Build a Supabase query from validated values instead of source code."""
+) -> list[tuple[str, tuple[Any, ...], dict[str, Any]]]:
+    """Define the validated SDK calls shared by execution and the code preview."""
     _validate_database_operation(operation)
     filter_specs = list(filters)
     if operation in {"update", "delete"} and not filter_specs:
         raise ValueError(f"{operation.capitalize()} requires at least one filter.")
 
-    table_builder = client.table(table)
-    count_kwargs = {"count": count} if count else {}
-
+    calls = [("table", (table,), {})]
+    kwargs = {"count": count} if count else {}
     if operation == "select":
-        query = table_builder.select(columns or "*", **count_kwargs)
-    elif operation == "insert":
-        query = table_builder.insert(_require_payload(payload), **count_kwargs)
-    elif operation == "upsert":
-        upsert_kwargs: dict[str, Any] = {
-            **count_kwargs,
-            "ignore_duplicates": ignore_duplicates,
-        }
-        if on_conflict:
-            upsert_kwargs["on_conflict"] = on_conflict
-        query = table_builder.upsert(_require_payload(payload), **upsert_kwargs)
-    elif operation == "update":
-        query = table_builder.update(_require_payload(payload), **count_kwargs)
+        args = (columns or "*",)
+    elif operation == "delete":
+        args = ()
     else:
-        query = table_builder.delete(**count_kwargs)
+        args = (_require_payload(payload),)
+    if operation == "upsert":
+        kwargs["ignore_duplicates"] = ignore_duplicates
+        if on_conflict:
+            kwargs["on_conflict"] = on_conflict
+    calls.append((operation, args, kwargs))
 
     for filter_spec in filter_specs:
         if filter_spec.method not in FILTER_OPERATORS.values():
             raise ValueError(f"Unsupported filter method: {filter_spec.method}")
-        filter_method = getattr(query, filter_spec.method, None)
-        if not callable(filter_method):
-            raise TypeError(f"Filter method is unavailable: {filter_spec.method}")
-        query = filter_method(filter_spec.column, filter_spec.value)
+        calls.append((filter_spec.method, (filter_spec.column, filter_spec.value), {}))
 
     if order_column:
         if operation != "select":
             raise ValueError("Ordering is only available for select queries in this demo.")
-        query = query.order(order_column, desc=order_desc)
+        calls.append(("order", (order_column,), {"desc": order_desc}))
     if limit is not None:
         if operation != "select":
             raise ValueError("Limiting is only available for select queries in this demo.")
         if limit < 1:
             raise ValueError("Limit must be at least 1.")
-        query = query.limit(limit)
+        calls.append(("limit", (limit,), {}))
+
+    return calls
+
+
+def build_database_query(client: Any, **params: Any) -> Any:
+    """Build a query using only validated, allowlisted SDK calls."""
+    query = client
+    for method, args, kwargs in _database_query_calls(**params):
+        query = getattr(query, method)(*args, **kwargs)
 
     return query
 
 
 def render_database_code(
     *,
-    table: str,
-    operation: str,
     ttl: str | float | None,
-    payload: dict[str, Any] | list[dict[str, Any]] | None = None,
-    columns: str = "*",
-    count: str | None = None,
-    ignore_duplicates: bool = False,
-    on_conflict: str | None = None,
-    filters: Iterable[FilterSpec] = (),
-    order_column: str | None = None,
-    order_desc: bool = False,
-    limit: int | None = None,
     client_expression: str = "st_supabase",
+    **params: Any,
 ) -> str:
-    """Render a copyable query preview from the same structured values."""
-    _validate_database_operation(operation)
-    count_kwargs = {"count": count} if count else {}
-
-    if operation == "select":
-        builder_call = _render_method("select", columns or "*", **count_kwargs)
-    elif operation == "insert":
-        builder_call = _render_method("insert", _require_payload(payload), **count_kwargs)
-    elif operation == "upsert":
-        upsert_kwargs: dict[str, Any] = {
-            **count_kwargs,
-            "ignore_duplicates": ignore_duplicates,
-        }
-        if on_conflict:
-            upsert_kwargs["on_conflict"] = on_conflict
-        builder_call = _render_method("upsert", _require_payload(payload), **upsert_kwargs)
-    elif operation == "update":
-        builder_call = _render_method("update", _require_payload(payload), **count_kwargs)
-    else:
-        builder_call = _render_method("delete", **count_kwargs)
-
-    lines = [
-        "query = (",
-        f"    {client_expression}.table({table!r})",
-        f"    {builder_call}",
+    """Render the same validated calls without executing any generated source."""
+    methods = [
+        _render_method(method, *args, **kwargs)
+        for method, args, kwargs in _database_query_calls(**params)
     ]
-    for filter_spec in filters:
-        lines.append(
-            f"    {_render_method(filter_spec.method, filter_spec.column, filter_spec.value)}"
-        )
-    if order_column:
-        lines.append(f"    {_render_method('order', order_column, desc=order_desc)}")
-    if limit is not None:
-        lines.append(f"    {_render_method('limit', limit)}")
+    lines = ["query = (", f"    {client_expression}{methods[0]}"]
+    lines.extend(f"    {method}" for method in methods[1:])
     lines.extend([")", f"response = execute_query(query, ttl={ttl!r})"])
     return "\n".join(lines)
 

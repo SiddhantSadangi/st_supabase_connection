@@ -13,3 +13,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "pip"
+    directory: "/demo"
+    schedule:
+      interval: "weekly"
+    groups:
+      demo-runtime:
+        patterns: ["*"]
