@@ -15,8 +15,7 @@ from session_clients import (
     validate_public_api_key,
 )
 from storage_workspace import render_storage_workspace
-from streamlit_extras.exception_handler import set_global_exception_handler
-from utils import custom_exception_handler
+from ui_helpers import sync_auth_context
 
 from st_supabase_connection import SupabaseConnection, __version__
 
@@ -35,17 +34,13 @@ st.set_page_config(
         "Get help": None,
     },
 )
-set_global_exception_handler(custom_exception_handler)
 
 
 def _initialize_state() -> None:
     st.session_state.setdefault("client", None)
-    st.session_state.setdefault("initialized", False)
     st.session_state.setdefault("project", None)
     st.session_state.setdefault("project_label", None)
-    st.session_state.setdefault("project_url", None)
-    st.session_state.setdefault("workspace", "Storage")
-    if st.session_state["workspace"] == "Authentication":
+    if st.session_state.get("workspace") == "Authentication":
         st.session_state["workspace"] = "Auth"
 
     if st.session_state.pop("_clear_connection_form", False):
@@ -68,15 +63,14 @@ def _reset_project() -> None:
             key
             in {
                 "client",
-                "initialized",
                 "project",
                 "project_label",
-                "project_url",
                 "connection_code",
                 "_connection_error",
                 "auth_otp_sent_to",
                 "_ux_confirmation",
                 "_ux_confirmed_action",
+                "_ux_auth_identity",
             }
             or key.startswith("_ux_result_")
             or key.startswith("_st_supabase_connection_session_client")
@@ -88,11 +82,6 @@ def _reset_project() -> None:
             or key.startswith("_database_")
         ):
             st.session_state.pop(key, None)
-    st.session_state["client"] = None
-    st.session_state["initialized"] = False
-    st.session_state["project"] = None
-    st.session_state["project_label"] = None
-    st.session_state["project_url"] = None
 
 
 def _connect(
@@ -118,7 +107,6 @@ def _connect(
         connection.session_client()
     except Exception as exc:
         st.session_state["client"] = None
-        st.session_state["initialized"] = False
         st.session_state["_connection_error"] = {
             "summary": "The Supabase client could not be initialized.",
             "details": str(exc),
@@ -127,10 +115,8 @@ def _connect(
 
     host = urlparse(url).hostname or url
     st.session_state["client"] = connection
-    st.session_state["initialized"] = True
     st.session_state["project"] = project
     st.session_state["project_label"] = "Demo project" if project == "demo" else host
-    st.session_state["project_url"] = url
     connection_lines = [
         "st_supabase = st.connection(",
         f"    name={name!r},",
@@ -152,7 +138,7 @@ def _render_sidebar() -> None:
     with st.sidebar:
         with st.expander(
             "How to use",
-            expanded=not st.session_state["initialized"],
+            expanded=st.session_state["client"] is None,
             icon=":material/lightbulb:",
         ):
             st.markdown(
@@ -164,7 +150,7 @@ def _render_sidebar() -> None:
                 """
             )
 
-        if st.session_state["initialized"]:
+        if st.session_state["client"] is not None:
             with st.container(border=True):
                 st.badge(
                     "Connected",
@@ -258,6 +244,7 @@ def _render_connect_page() -> None:
         "Project source",
         options=["Demo project", "Own project"],
         default="Demo project",
+        required=True,
         key="connection_source",
     )
     if st.session_state.get("_connection_source_last") != source:
@@ -363,6 +350,15 @@ def _render_connect_page() -> None:
 
 
 def _render_workspace() -> None:
+    connection = st.session_state["client"]
+    try:
+        session = connection.session_client().auth.get_session()
+    except Exception:
+        sync_auth_context(None)
+        st.error("Your authentication session could not be checked. Retry or change project.")
+        return
+    sync_auth_context(getattr(getattr(session, "user", None), "id", None))
+
     project_label = st.session_state["project_label"]
     with st.container(border=True):
         st.markdown(f"**Connected to {project_label}**")
@@ -384,10 +380,11 @@ def _render_workspace() -> None:
     workspace = st.segmented_control(
         "Workspace",
         options=["Storage", "Database", "Auth"],
+        default="Storage",
+        required=True,
         key="workspace",
         label_visibility="collapsed",
     )
-    connection = st.session_state["client"]
     common = {
         "project": st.session_state["project"],
         "project_label": project_label,
@@ -410,7 +407,7 @@ st.caption(
     "(https://github.com/SiddhantSadangi/st_supabase_connection)."
 )
 
-if st.session_state["initialized"]:
+if st.session_state["client"] is not None:
     _render_workspace()
 else:
     _render_connect_page()

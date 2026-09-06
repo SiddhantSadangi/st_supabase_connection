@@ -7,57 +7,22 @@ from demo.safe_execution import (
     build_database_query,
     parse_filter_rows,
     parse_json_records,
-    parse_string_list,
     render_database_code,
 )
 
 
-class FakeQuery:
+class RecordingClient:
+    """Record fluent calls without reimplementing the Supabase SDK."""
+
     def __init__(self):
         self.calls = []
 
-    def _record(self, method, *args, **kwargs):
-        self.calls.append((method, args, kwargs))
-        return self
+    def __getattr__(self, method):
+        def record(*args, **kwargs):
+            self.calls.append((method, args, kwargs))
+            return self
 
-    def select(self, *args, **kwargs):
-        return self._record("select", *args, **kwargs)
-
-    def insert(self, *args, **kwargs):
-        return self._record("insert", *args, **kwargs)
-
-    def upsert(self, *args, **kwargs):
-        return self._record("upsert", *args, **kwargs)
-
-    def update(self, *args, **kwargs):
-        return self._record("update", *args, **kwargs)
-
-    def delete(self, *args, **kwargs):
-        return self._record("delete", *args, **kwargs)
-
-    def eq(self, *args, **kwargs):
-        return self._record("eq", *args, **kwargs)
-
-    def is_(self, *args, **kwargs):
-        return self._record("is_", *args, **kwargs)
-
-    def in_(self, *args, **kwargs):
-        return self._record("in_", *args, **kwargs)
-
-    def order(self, *args, **kwargs):
-        return self._record("order", *args, **kwargs)
-
-    def limit(self, *args, **kwargs):
-        return self._record("limit", *args, **kwargs)
-
-
-class FakeClient:
-    def __init__(self):
-        self.query = FakeQuery()
-
-    def table(self, table):
-        self.query.calls.append(("table", (table,), {}))
-        return self.query
+        return record
 
 
 class SafeExecutionTests(unittest.TestCase):
@@ -86,17 +51,6 @@ class SafeExecutionTests(unittest.TestCase):
             ):
                 parse_filter_rows([{"Column": "value", "Operator": "Equals", "Value": constant}])
 
-    def test_string_list_requires_json_strings(self):
-        self.assertEqual(parse_string_list('["a", "b"]', field_name="Paths"), ["a", "b"])
-        self.assertIsNone(parse_string_list("[]", field_name="Allowed MIME types", optional=True))
-        with self.assertRaisesRegex(ValueError, "JSON array"):
-            parse_string_list("['a']", field_name="Paths")
-
-    def test_filter_rows_allowlist_methods_and_treat_source_as_text(self):
-        source = "__import__('os').system('echo unsafe')"
-        filters = parse_filter_rows([{"Column": "name", "Operator": "Equals", "Value": source}])
-        self.assertEqual(filters, [FilterSpec("name", "eq", source)])
-
     def test_filter_rows_require_explicit_missing_values(self):
         for missing_value in (None, math.nan, ""):
             with (
@@ -116,24 +70,6 @@ class SafeExecutionTests(unittest.TestCase):
         filters = parse_filter_rows([{"Column": "deleted_at", "Operator": "Is", "Value": "null"}])
         self.assertEqual(filters, [FilterSpec("deleted_at", "is_", "null")])
 
-        client = FakeClient()
-        build_database_query(
-            client,
-            table="countries",
-            operation="select",
-            filters=filters,
-        )
-        self.assertIn(("is_", ("deleted_at", "null"), {}), client.query.calls)
-
-        code = render_database_code(
-            table="countries",
-            operation="select",
-            ttl=0,
-            filters=filters,
-        )
-        ast.parse(code)
-        self.assertIn(".is_('deleted_at', 'null')", code)
-
     def test_is_filter_normalizes_boolean_literals(self):
         filters = parse_filter_rows(
             [
@@ -149,26 +85,6 @@ class SafeExecutionTests(unittest.TestCase):
             ],
         )
 
-        client = FakeClient()
-        build_database_query(
-            client,
-            table="countries",
-            operation="select",
-            filters=filters,
-        )
-        self.assertIn(("is_", ("is_active", "true"), {}), client.query.calls)
-        self.assertIn(("is_", ("is_archived", "false"), {}), client.query.calls)
-
-        code = render_database_code(
-            table="countries",
-            operation="select",
-            ttl=0,
-            filters=filters,
-        )
-        ast.parse(code)
-        self.assertIn(".is_('is_active', 'true')", code)
-        self.assertIn(".is_('is_archived', 'false')", code)
-
     def test_in_filter_requires_a_json_array(self):
         for value in ("Asia", '"Asia"', "42", "true", '{"continent": "Asia"}'):
             with self.subTest(value=value), self.assertRaisesRegex(ValueError, "JSON array"):
@@ -179,26 +95,8 @@ class SafeExecutionTests(unittest.TestCase):
         )
         self.assertEqual(filters, [FilterSpec("continent", "in_", ["Asia", "Europe"])])
 
-        client = FakeClient()
-        build_database_query(
-            client,
-            table="countries",
-            operation="select",
-            filters=filters,
-        )
-        self.assertIn(("in_", ("continent", ["Asia", "Europe"]), {}), client.query.calls)
-
-        code = render_database_code(
-            table="countries",
-            operation="select",
-            ttl=0,
-            filters=filters,
-        )
-        ast.parse(code)
-        self.assertIn(".in_('continent', ['Asia', 'Europe'])", code)
-
     def test_build_select_query_from_structured_values(self):
-        client = FakeClient()
+        client = RecordingClient()
         query = build_database_query(
             client,
             table="countries",
@@ -210,9 +108,9 @@ class SafeExecutionTests(unittest.TestCase):
             order_desc=True,
             limit=5,
         )
-        self.assertIs(query, client.query)
+        self.assertIs(query, client)
         self.assertEqual(
-            client.query.calls,
+            client.calls,
             [
                 ("table", ("countries",), {}),
                 ("select", ("name, continent",), {"count": "exact"}),
@@ -222,41 +120,82 @@ class SafeExecutionTests(unittest.TestCase):
             ],
         )
 
-    def test_update_and_delete_require_a_filter(self):
-        for operation in ("update", "delete"):
-            with (
-                self.subTest(operation=operation),
-                self.assertRaisesRegex(ValueError, "requires at least one filter"),
-            ):
-                build_database_query(
-                    FakeClient(),
-                    table="countries",
-                    operation=operation,
-                    payload={"name": "unsafe bulk mutation"} if operation == "update" else None,
+    def test_preview_matches_sdk_calls_for_every_database_operation(self):
+        source = "__import__('os').system('this must remain text')"
+        cases = [
+            {
+                "operation": "select",
+                "columns": "name",
+                "count": "exact",
+                "filters": parse_filter_rows(
+                    [
+                        {"Column": "name", "Operator": "Equals", "Value": source},
+                        {"Column": "deleted_at", "Operator": "Is", "Value": "null"},
+                        {"Column": "active", "Operator": "Is", "Value": "true"},
+                        {"Column": "continent", "Operator": "In", "Value": '["Asia", "Europe"]'},
+                    ]
+                ),
+                "order_column": "name",
+                "order_desc": True,
+                "limit": 5,
+            },
+            {"operation": "insert", "payload": [{"name": source}], "count": "exact"},
+            {
+                "operation": "upsert",
+                "payload": {"id": 1, "name": source},
+                "ignore_duplicates": True,
+                "on_conflict": "id",
+            },
+            {
+                "operation": "update",
+                "payload": {"name": source},
+                "filters": [FilterSpec("id", "eq", 1)],
+            },
+            {"operation": "delete", "filters": [FilterSpec("id", "eq", 1)]},
+        ]
+        for params in cases:
+            with self.subTest(operation=params["operation"]):
+                client = RecordingClient()
+                build_database_query(client, table="countries", **params)
+                code = render_database_code(
+                    table="countries", ttl=0, client_expression="supabase", **params
                 )
+                node = ast.parse(code).body[0].value
+                preview_calls = []
+                while isinstance(node, ast.Call):
+                    preview_calls.append(
+                        (
+                            node.func.attr,
+                            tuple(ast.literal_eval(arg) for arg in node.args),
+                            {kw.arg: ast.literal_eval(kw.value) for kw in node.keywords},
+                        )
+                    )
+                    node = node.func.value
+                self.assertEqual(list(reversed(preview_calls)), client.calls)
+                self.assertEqual(node.id, "supabase")
+                self.assertIn("response = execute_query(query, ttl=0)", code)
+                if params["operation"] == "select":
+                    self.assertIn(("eq", ("name", source), {}), client.calls)
 
-    def test_rendered_code_is_copyable_but_not_executed(self):
-        source = "__import__('os').system('echo only text')"
-        code = render_database_code(
-            table="countries",
-            operation="select",
-            columns="*",
-            ttl=None,
-            filters=[FilterSpec("name", "eq", source)],
-        )
-        self.assertIn(".eq('name'", code)
-        self.assertIn(source, code)
-        self.assertIn("response = execute_query(query, ttl=None)", code)
-
-    def test_rendered_code_can_use_the_session_scoped_client(self):
-        code = render_database_code(
-            table="private_profiles",
-            operation="select",
-            ttl=0,
-            client_expression="supabase",
-        )
-
-        self.assertIn("supabase.table('private_profiles')", code)
+    def test_preview_and_execution_reject_the_same_invalid_queries(self):
+        cases = [
+            {"operation": "execute"},
+            {"operation": "insert"},
+            {"operation": "delete"},
+            {"operation": "update", "payload": {"name": "Example"}},
+            {"operation": "select", "filters": [FilterSpec("id", "execute", 1)]},
+            {"operation": "select", "limit": 0},
+            {"operation": "insert", "payload": {"id": 1}, "order_column": "id"},
+            {"operation": "insert", "payload": {"id": 1}, "limit": 1},
+        ]
+        for params in cases:
+            with self.subTest(params=params):
+                client = RecordingClient()
+                with self.assertRaises(ValueError):
+                    build_database_query(client, table="countries", **params)
+                with self.assertRaises(ValueError):
+                    render_database_code(table="countries", ttl=0, **params)
+                self.assertEqual(client.calls, [])
 
 
 if __name__ == "__main__":

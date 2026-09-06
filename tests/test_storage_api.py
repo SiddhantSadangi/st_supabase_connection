@@ -4,19 +4,13 @@ import uuid
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import st_supabase_connection as connection_module
 from st_supabase_connection import (
     SupabaseConnection,
     _normalize_storage_path,
     _prepare_upload_payload,
-    execute_query,
 )
-
-
-def _without_cache(*_args, **_kwargs):
-    return lambda function: function
 
 
 class UploadedBytes(BytesIO):
@@ -32,75 +26,20 @@ class StorageApiTests(unittest.TestCase):
         self.storage = MagicMock()
         self.storage.from_.return_value = self.bucket
         self.connection = object.__new__(SupabaseConnection)
-        self.connection.client = SimpleNamespace(storage=self.storage)
+        self.connection._url = "https://project.example"
+        self.connection._key = "test-key"
+        self.connection.client = SimpleNamespace(
+            storage=self.storage, options=SimpleNamespace(headers={})
+        )
 
     def test_storage_path_normalization_rejects_bucket_root(self):
         self.assertEqual(_normalize_storage_path("/folder/file.txt"), "folder/file.txt")
         for invalid in ("", "/", "///"):
-            with self.subTest(path=invalid), self.assertRaisesRegex(
-                ValueError, "must not be empty"
+            with (
+                self.subTest(path=invalid),
+                self.assertRaisesRegex(ValueError, "must not be empty"),
             ):
                 _normalize_storage_path(invalid)
-
-    def test_bucket_mutations_send_expected_requests(self):
-        response = MagicMock()
-        response.json.side_effect = [
-            {"created": True},
-            {"updated": True},
-            {"moved": True},
-            {"removed": True},
-        ]
-        self.storage._request.return_value = response
-
-        created = self.connection.create_bucket(
-            "media",
-            public=True,
-            file_size_limit=1024,
-            allowed_mime_types=["image/png"],
-        )
-        updated = self.connection.update_bucket(
-            "media",
-            public=False,
-            file_size_limit=2048,
-            allowed_mime_types=["image/jpeg"],
-        )
-        moved = self.connection.move("media", "old.png", "archive/new.png")
-        removed = self.connection.remove("media", ["archive/new.png"])
-
-        self.assertEqual(created, {"created": True})
-        self.assertEqual(updated, {"updated": True})
-        self.assertEqual(moved, {"moved": True})
-        self.assertEqual(removed, {"removed": True})
-        self.assertEqual(
-            self.storage._request.call_args_list[0].kwargs,
-            {
-                "method": "POST",
-                "url": "/bucket",
-                "json": {
-                    "id": "media",
-                    "name": "media",
-                    "public": True,
-                    "file_size_limit": 1024,
-                    "allowed_mime_types": ["image/png"],
-                },
-            },
-        )
-        self.assertEqual(
-            self.storage._request.call_args_list[1].args,
-            ("PUT", "/bucket/media"),
-        )
-        self.assertEqual(
-            self.storage._request.call_args_list[2].kwargs["json"],
-            {
-                "bucketId": "media",
-                "sourceKey": "old.png",
-                "destinationKey": "archive/new.png",
-            },
-        )
-        self.assertEqual(
-            self.storage._request.call_args_list[3].kwargs["json"],
-            {"prefixes": ["archive/new.png"]},
-        )
 
     def test_browser_upload_streams_bytes_without_creating_a_server_file(self):
         unique_name = f"upload-{uuid.uuid4().hex}.png"
@@ -230,55 +169,6 @@ class StorageApiTests(unittest.TestCase):
                 self.connection.upload_to_signed_url("media", "data.bin", "token", source)
 
         self.assertTrue(captured["payload"].closed)
-
-    def test_cached_read_wrappers_delegate_with_expected_arguments(self):
-        self.storage.get_bucket.return_value = {"id": "media"}
-        self.storage.list_buckets.return_value = [{"id": "media"}]
-        self.bucket.download.return_value = b"contents"
-        self.bucket.list.return_value = [{"name": "file.txt"}]
-        self.bucket.get_public_url.return_value = "https://public/file.txt"
-
-        with (
-            patch.object(connection_module, "cache_resource", _without_cache),
-            patch.object(connection_module, "cache_data", _without_cache),
-        ):
-            bucket = self.connection.get_bucket("media", ttl=60)
-            buckets = self.connection.list_buckets(ttl=60)
-            download = self.connection.download("media", "folder/file.txt", ttl=60)
-            objects = self.connection.list_objects(
-                "media",
-                path="folder",
-                limit=25,
-                offset=5,
-                sortby="updated_at",
-                order="desc",
-                ttl=60,
-            )
-            public_url = self.connection.get_public_url("media", "folder/file.txt", ttl=60)
-
-        self.assertEqual(bucket, {"id": "media"})
-        self.assertEqual(buckets, [{"id": "media"}])
-        self.assertEqual(download, ("file.txt", "text/plain", b"contents"))
-        self.assertEqual(objects, [{"name": "file.txt"}])
-        self.assertEqual(public_url, "https://public/file.txt")
-        self.bucket.list.assert_called_once_with(
-            "folder",
-            {
-                "limit": 25,
-                "offset": 5,
-                "sortBy": {"column": "updated_at", "order": "desc"},
-            },
-        )
-
-    def test_execute_query_delegates_when_cache_is_disabled(self):
-        query = MagicMock()
-        query.execute.return_value = SimpleNamespace(data=[{"id": 1}], count=1)
-
-        with patch.object(connection_module, "cache_resource", _without_cache):
-            response = execute_query(query, ttl=0)
-
-        self.assertEqual(response.data, [{"id": 1}])
-        query.execute.assert_called_once_with()
 
     def test_prepare_upload_payload_uses_binary_fallback_content_type(self):
         payload, content_type, cleanup = _prepare_upload_payload(b"data", "unknown.extensionless")

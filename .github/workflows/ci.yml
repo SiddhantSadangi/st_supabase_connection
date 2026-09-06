@@ -14,13 +14,18 @@ concurrency:
 
 jobs:
   test:
-    name: Python ${{ matrix.python-version }} / Streamlit ${{ matrix.streamlit-version }}
+    name: Python ${{ matrix.python-version }} / Streamlit ${{ matrix.streamlit-version }} / Supabase ${{ matrix.supabase-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         streamlit-version: ["1.62.0", "latest"]
+        supabase-version: ["latest"]
+        include:
+          - python-version: "3.10"
+            streamlit-version: "1.62.0"
+            supabase-version: "2.22.0"
 
     steps:
       - name: Check out the repository
@@ -39,14 +44,28 @@ jobs:
         run: >-
           python -m pip install --editable .
           "streamlit==${{ matrix.streamlit-version }}"
-          streamlit-extras
 
       - name: Install the package with latest Streamlit
         if: matrix.streamlit-version == 'latest'
-        run: python -m pip install --upgrade --editable . streamlit streamlit-extras
+        run: python -m pip install --upgrade --editable . streamlit
+
+      - name: Install minimum supported Supabase
+        if: matrix.supabase-version != 'latest'
+        # Supabase 2.22.0 leaves component versions unbounded; test its matching SDK cohort.
+        run: >-
+          python -m pip install
+          "supabase==${{ matrix.supabase-version }}"
+          "postgrest==${{ matrix.supabase-version }}"
+          "storage3==${{ matrix.supabase-version }}"
+          "supabase-auth==${{ matrix.supabase-version }}"
+          "supabase-functions==${{ matrix.supabase-version }}"
+          "realtime==${{ matrix.supabase-version }}"
 
       - name: Show resolved versions
         run: python -m pip show st-supabase-connection streamlit supabase
+
+      - name: Check dependency compatibility
+        run: python -m pip check
 
       - name: Run library and demo tests
         run: python -m unittest discover --start-directory tests --verbose
@@ -80,3 +99,18 @@ jobs:
         run: |
           cd "${RUNNER_TEMP}"
           python -c "import importlib.metadata as metadata; import st_supabase_connection as package; from st_supabase_connection import SupabaseConnection, execute_query; assert metadata.version('st-supabase-connection') == package.__version__; print(f'Installed st-supabase-connection {package.__version__}')"
+
+  demo:
+    name: Pinned demo runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install the deployed dependency set
+        run: python -m pip install -r demo/requirements.txt
+      - name: Check dependency compatibility
+        run: python -m pip check
+      - name: Run library and demo tests
+        run: python -m unittest discover --start-directory tests --verbose

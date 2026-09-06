@@ -16,20 +16,22 @@ from demo.session_clients import (
 
 
 class SessionClientTests(unittest.TestCase):
-    def test_resolves_nested_connection_secrets_with_publishable_alias(self):
-        secrets = {
-            "connections": {
-                "supabase": {
-                    "SUPABASE_URL": " https://demo.supabase.co ",
-                    "SUPABASE_PUBLISHABLE_KEY": " sb_publishable_example ",
+    def test_nested_secrets_prefer_publishable_key_and_trim_whitespace(self):
+        for legacy in ({}, {"SUPABASE_KEY": "legacy-key"}):
+            with self.subTest(legacy=bool(legacy)):
+                secrets = {
+                    "connections": {
+                        "supabase": {
+                            "SUPABASE_URL": " https://demo.supabase.co ",
+                            "SUPABASE_PUBLISHABLE_KEY": " sb_publishable_example ",
+                            **legacy,
+                        }
+                    }
                 }
-            }
-        }
-
-        self.assertEqual(
-            resolve_connection_credentials(secrets, {}),
-            ("https://demo.supabase.co", "sb_publishable_example"),
-        )
+                self.assertEqual(
+                    resolve_connection_credentials(secrets, {}),
+                    ("https://demo.supabase.co", "sb_publishable_example"),
+                )
 
     def test_resolves_environment_credentials(self):
         environ = {
@@ -57,23 +59,7 @@ class SessionClientTests(unittest.TestCase):
             ("https://environment.supabase.co", "sb_publishable_environment"),
         )
 
-    def test_publishable_alias_takes_precedence_over_legacy_key_name(self):
-        secrets = {
-            "connections": {
-                "supabase": {
-                    "SUPABASE_URL": "https://demo.supabase.co",
-                    "SUPABASE_KEY": "legacy-key",
-                    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_example",
-                }
-            }
-        }
-
-        self.assertEqual(
-            resolve_connection_credentials(secrets, {}),
-            ("https://demo.supabase.co", "sb_publishable_example"),
-        )
-
-    def test_missing_credentials_raise_without_exposing_values(self):
+    def test_missing_credentials_raise(self):
         with self.assertRaisesRegex(ConnectionRefusedError, "Supabase URL and key not provided"):
             resolve_connection_credentials({}, {})
 
@@ -162,9 +148,9 @@ class SessionClientTests(unittest.TestCase):
             validate_public_api_key("sb_secret_example"),
             "Secret keys are not accepted. Use an sb_publishable_ key instead.",
         )
-        self.assertIsNone(validate_public_api_key(self._legacy_key("anon")))
+        self.assertIsNone(validate_public_api_key(self._legacy_key_payload({"role": "anon"})))
         self.assertEqual(
-            validate_public_api_key(self._legacy_key("service_role")),
+            validate_public_api_key(self._legacy_key_payload({"role": "service_role"})),
             "Service-role keys are not accepted. Use a publishable key instead.",
         )
         for payload in ([], None, "anon"):
@@ -173,10 +159,6 @@ class SessionClientTests(unittest.TestCase):
                     validate_public_api_key(self._legacy_key_payload(payload)),
                     "Enter an sb_publishable_ key or a legacy anon key.",
                 )
-
-    @staticmethod
-    def _legacy_key(role):
-        return SessionClientTests._legacy_key_payload({"role": role})
 
     @staticmethod
     def _legacy_key_payload(value):

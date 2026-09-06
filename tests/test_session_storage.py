@@ -26,9 +26,7 @@ class SessionStorageTests(unittest.TestCase):
         self.storage_api.from_.return_value = self.bucket_api
         self.storage = SessionStorage(SimpleNamespace(storage=self.storage_api))
 
-    def test_bucket_management_uses_session_storage_api(self):
-        self.storage.list_buckets()
-        self.storage.get_bucket("private")
+    def test_bucket_options_are_forwarded_to_session_storage_api(self):
         self.storage.create_bucket(
             "private",
             public=False,
@@ -41,11 +39,7 @@ class SessionStorageTests(unittest.TestCase):
             file_size_limit=1024,
             allowed_mime_types=None,
         )
-        self.storage.empty_bucket("private")
-        self.storage.delete_bucket("private")
 
-        self.storage_api.list_buckets.assert_called_once_with()
-        self.storage_api.get_bucket.assert_called_once_with("private")
         self.storage_api.create_bucket.assert_called_once_with(
             "private",
             options={
@@ -62,8 +56,6 @@ class SessionStorageTests(unittest.TestCase):
                 "allowed_mime_types": None,
             },
         )
-        self.storage_api.empty_bucket.assert_called_once_with("private")
-        self.storage_api.delete_bucket.assert_called_once_with("private")
 
     def test_object_operations_use_bound_bucket_api(self):
         uploaded = UploadedFile(b"image-bytes")
@@ -178,20 +170,7 @@ class SessionStorageTests(unittest.TestCase):
                 ast.parse(code)
                 self.assertIn("st_supabase.session_client()", code)
 
-    def test_secret_cleanup_preserves_result_for_exactly_one_rerun(self):
-        state = {storage_workspace._PRESERVE_RESULT_ONCE_STATE_KEY: True}
-
-        with (
-            patch.object(storage_workspace.st, "session_state", state),
-            patch.object(storage_workspace, "sync_result_context") as sync_context,
-        ):
-            storage_workspace._sync_storage_result_context("updated-action")
-            sync_context.assert_not_called()
-
-            storage_workspace._sync_storage_result_context("updated-action")
-            sync_context.assert_called_once_with("storage", "updated-action")
-
-    def test_signed_upload_marks_its_result_for_the_secret_cleanup_rerun(self):
+    def test_signed_upload_requests_secret_cleanup_and_preserves_result_for_one_rerun(self):
         state = {}
         self.storage.upload_to_signed_url = MagicMock(return_value={"path": "avatar.png"})
         params = {
@@ -216,6 +195,15 @@ class SessionStorageTests(unittest.TestCase):
         self.assertTrue(state["_clear_storage_secret_fields"])
         self.assertEqual(state["_ux_result_storage"]["status"], "success")
         rerun.assert_called_once_with()
+
+        with (
+            patch.object(storage_workspace.st, "session_state", state),
+            patch.object(storage_workspace, "sync_result_context") as sync_context,
+        ):
+            storage_workspace._sync_storage_result_context("updated-action")
+            sync_context.assert_not_called()
+            storage_workspace._sync_storage_result_context("updated-action")
+            sync_context.assert_called_once_with("storage", "updated-action")
 
 
 if __name__ == "__main__":

@@ -162,16 +162,17 @@ Follow Supabase's [Data API security guide](https://supabase.com/docs/guides/api
 
 ## Cache-safe writes
 
-`execute_query()` accepts all common query builders, but writes should normally use `.execute()` directly. If existing code passes writes through `execute_query()`, set `ttl=0`:
+`execute_query()` accepts common query builders and, starting in 2.2.1, automatically executes writes without caching. This is safe even when no `ttl` is supplied:
 
 ```python
 response = execute_query(
     connection.table("countries").insert({"name": "Wakanda"}),
-    ttl=0,
 )
 ```
 
 A write does not invalidate an earlier cached select. For an immediately consistent UI, run the next select directly or with `ttl=0`; otherwise, use a suitably short finite TTL.
+
+POST-based RPC calls also bypass the cache, since a function may change data. Explicitly read-only GET/HEAD RPC calls can be cached.
 
 ## Troubleshooting
 

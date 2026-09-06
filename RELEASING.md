@@ -45,6 +45,18 @@ version before rerunning if `2.2.0` has already been uploaded there.
 
 ## Publish to PyPI
 
+Before publishing, run a brief browser smoke test against the updated demo:
+
+- Sign in, read Database and Storage results, sign out, and return to both workspaces:
+  previous results and downloads must be gone. Repeat with a different account.
+- Review a write, check that an incorrect phrase cannot confirm it, then cancel.
+  Confirm only against a disposable test target; verify the result and clean up.
+- Confirm fresh reads are the default and cached reads can be enabled explicitly.
+- Check sidebar navigation and the version display at desktop and narrow window widths.
+
+AppTest covers server-side state transitions but is not a substitute for checking
+the actual dialog lifecycle and layout in a browser.
+
 1. Confirm CI passes on the release commit.
 2. Confirm `src/st_supabase_connection/__init__.py` contains the intended version.
 3. Create and publish a GitHub Release using the matching tag, such as `v2.2.0`.

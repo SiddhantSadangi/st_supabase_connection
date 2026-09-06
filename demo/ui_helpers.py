@@ -37,37 +37,39 @@ def construct_call(receiver: str, operation: str, /, *args: Any, **kwargs: Any) 
 
 
 def cache_ttl_input(key_prefix: str) -> int | None:
-    """Return a typed query TTL. None means until cleared; 0 means no cache."""
+    """Return a query TTL: None means no time-based expiry; 0 bypasses caching."""
     with st.expander("Cache settings", icon=":material/cached:"):
         left, right = st.columns(2, vertical_alignment="bottom")
         always_fresh = left.toggle(
             "Always fetch fresh",
-            value=False,
+            value=True,
             key=f"{key_prefix}_fresh",
             help="Turn on to skip cached query results.",
         )
         ttl_seconds = right.number_input(
             "Cache TTL (seconds)",
             min_value=0,
-            value=0,
+            value=60,
             step=60,
             key=f"{key_prefix}_ttl",
             disabled=always_fresh,
-            help="0 keeps results until the server cache is cleared.",
+            help="When caching is enabled, 0 means no time-based expiration; entries can still be evicted.",
         )
     return 0 if always_fresh else (int(ttl_seconds) or None)
 
 
-def connection_ttl_input(key: str) -> int | None:
-    ttl_seconds = st.number_input(
-        "Connection cache TTL (seconds)",
-        min_value=0,
-        value=0,
-        step=300,
-        key=key,
-        help="0 keeps the connection resource until its cache is cleared.",
-    )
-    return int(ttl_seconds) or None
+def sync_auth_context(user_id: str | None) -> None:
+    """Discard user-bound UI state before rendering a different Auth identity."""
+    if "_ux_auth_identity" in st.session_state and st.session_state["_ux_auth_identity"] == user_id:
+        return
+    for key in list(st.session_state):
+        if (
+            key.startswith(("_ux_result_database", "_ux_result_storage", "_ux_result_context_"))
+            or key.startswith(("storage_", "_storage_"))
+            or key in {"_ux_confirmation", "_ux_confirmed_action", "_ux_confirmation_phrase"}
+        ):
+            st.session_state.pop(key, None)
+    st.session_state["_ux_auth_identity"] = user_id
 
 
 def action_fingerprint(scope: str, values: Any) -> str:

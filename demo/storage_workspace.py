@@ -75,6 +75,7 @@ def render_storage_workspace(connection: Any, *, project: str, project_label: st
             "Operation type",
             options=list(OPERATION_GROUPS),
             default="Read",
+            required=True,
             key="storage_risk",
         )
 
@@ -306,6 +307,7 @@ def _render_inputs(
             "Direction",
             options=["Ascending", "Descending"],
             default="Ascending",
+            required=True,
             key="storage_list_order",
         )
     elif operation == "download":

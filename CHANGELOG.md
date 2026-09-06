@@ -5,6 +5,41 @@ All notable changes to `st-supabase-connection` are documented here. This projec
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-09-06
+
+### Changed
+
+- Library read caches now retain at most 128 entries per operation; TTL semantics are unchanged.
+- The demo defaults to fresh reads, with a 60-second TTL when caching is enabled.
+- Pinned the Python 3.12 demo runtime independently of library dependency ranges, with CI verification.
+- Added a minimal `pyproject.toml` for the build backend and formatter settings.
+- Cached library reads now return independent data copies instead of shared mutable resources.
+- Bucket creation/update and object move/remove delegate to the public Storage SDK methods.
+- Removed public-URL result caching; the existing `ttl` argument remains accepted and is ignored.
+- Corrected Storage return annotations and the signed-upload token documentation.
+- Simplified the demo to use Streamlit's default exception reporting; removed the
+  SMTP traceback hook and the `streamlit-extras` dependency.
+- Database query execution and the generated Python preview now share the same
+  validated call sequence.
+- Removed unused demo helpers, redundant connection state, and optional profile
+  and attribution fields from the custom-project sign-up example.
+
+### Fixed
+
+- Workspace navigation has an explicit initial selection, and single-choice controls cannot be cleared accidentally.
+- The demo clears Database/Storage results and pending confirmations when the authenticated user changes or signs out.
+- Workspace rendering stops if the Auth session cannot be checked, hiding previously displayed results.
+- Isolated Storage result caches by project, credentials, and current headers, including authorization changes.
+- `execute_query()` no longer caches writes, POST-based RPC calls, or unrecognized request methods, even when a TTL is supplied.
+- Preserved the documented single-string MIME type input to `update_bucket()` by converting it to an SDK-compatible list.
+- Auth forms validate on submission so users can submit newly entered sign-in,
+  sign-up, and OTP fields without an unrelated app rerun.
+
+### Tests
+
+- Added real-cache regression tests with mocked HTTP transports for project/auth isolation, repeated writes, response mutation, and Storage SDK request compatibility.
+- Added a CI case for the minimum supported Supabase version alongside the existing Python/Streamlit matrix.
+
 ## [2.2.0] - 2026-08-25
 
 ### Added
@@ -81,5 +116,6 @@ response = supabase.table("private_profiles").select("*").execute()
 For user-facing apps, prefer `SUPABASE_PUBLISHABLE_KEY`. The legacy `SUPABASE_KEY` name remains
 supported, so renaming it is recommended but not required for 2.2.0.
 
-[Unreleased]: https://github.com/SiddhantSadangi/st_supabase_connection/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/SiddhantSadangi/st_supabase_connection/compare/v2.2.1...HEAD
+[2.2.1]: https://github.com/SiddhantSadangi/st_supabase_connection/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/SiddhantSadangi/st_supabase_connection/compare/v2.1.3...v2.2.0

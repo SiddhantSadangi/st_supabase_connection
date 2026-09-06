@@ -13,6 +13,8 @@ for bucket in buckets:
 
 Use a finite TTL when bucket configuration may change while the app is running.
 
+Bucket reads return SDK bucket models (for example, `bucket.name`), not dictionaries. In 2.2.1, cached models and lists are returned as independent copies and are isolated by project and credentials. See [Caching](caching.md) for details.
+
 ## Get one bucket
 
 ```python
@@ -157,12 +159,13 @@ For an object in a public bucket:
 public_url = connection.get_public_url(
     bucket_id="public-assets",
     filepath="images/logo.png",
-    ttl="1h",
 )
 st.link_button("Open image", public_url)
 ```
 
 Generating a public URL does not make a private bucket public and does not verify that the object exists.
+
+This operation only constructs a URL locally; it is not cached. The legacy `ttl` argument is still accepted but ignored.
 
 ## Signed download URLs
 

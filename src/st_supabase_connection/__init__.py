@@ -2,7 +2,7 @@ import hashlib
 import mimetypes
 import os
 import warnings
-from collections.abc import Callable, Iterable, MutableMapping
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from datetime import timedelta
 from io import BytesIO
 from pathlib import Path
@@ -14,14 +14,16 @@ from postgrest import (
     SyncQueryRequestBuilder,
     SyncSelectRequestBuilder,
 )
-from streamlit import cache_data, cache_resource, session_state
+from storage3.types import BaseBucket, UploadResponse
+from streamlit import cache_data, session_state
 from streamlit.connections import BaseConnection
 from supabase import Client, create_client
 from supabase_auth.types import AuthResponse, SignInWithPasswordCredentials
 
-__version__ = "2.2.0"
+__version__ = "2.2.1"
 
 _DEFAULT_MIME_TYPE = "application/octet-stream"
+_MAX_CACHE_ENTRIES = 128
 _SESSION_CLIENT_STATE_PREFIX = "_st_supabase_connection_session_client"
 
 
@@ -55,6 +57,11 @@ def _get_or_create_session_client(
     return client
 
 
+def _query_method(query: Any) -> str:
+    request = getattr(query, "request", None)
+    return str(getattr(request, "method", None) or getattr(request, "http_method", "")).upper()
+
+
 def _query_hash(query: Any) -> str:
     """Hash a query without exposing credentials or sharing cached user data."""
     request = query.request
@@ -78,7 +85,7 @@ def _query_hash(query: Any) -> str:
                 normalized_value = hashlib.sha256(normalized_value.encode()).hexdigest()
             normalized_headers[normalized_name] = normalized_value
     material = (
-        str(getattr(request, "method", None) or getattr(request, "http_method", "")),
+        _query_method(query),
         str(base_url),
         str(getattr(request, "url", "")),
         str(getattr(request, "path", "")),
@@ -158,8 +165,6 @@ class SupabaseConnection(BaseConnection[Client]):
     ----------
     client : supabase.Client
         Supabase client initialized with the supabase URL and key
-    storage : supabase.SupabaseStorageClient
-        Supabase storage client initialized with the supabase URL and key
 
     Methods
     -------
@@ -258,11 +263,32 @@ class SupabaseConnection(BaseConnection[Client]):
         )
         return self.session_client().auth.sign_in_with_password(credentials)
 
+    def _storage_cache_key(self, storage: Any) -> str:
+        """Scope cached data to the project, credentials, and current Storage headers.
+
+        Storage3 exposes headers differently across supported versions. Include
+        each layer so a token refresh or a caller-supplied header changes the key.
+        Only the digest is passed to Streamlit's cache, never the raw credentials.
+        """
+        header_layers = (
+            self.client.options.headers,
+            getattr(storage, "headers", {}),
+            getattr(storage, "_headers", {}),
+            getattr(getattr(storage, "session", None), "headers", {}),
+        )
+        headers = tuple(
+            tuple(sorted((str(name).lower(), str(value)) for name, value in layer.items()))
+            for layer in header_layers
+            if isinstance(layer, Mapping)
+        )
+        material = (self._url, self._key, headers)
+        return hashlib.sha256(repr(material).encode()).hexdigest()
+
     def get_bucket(
         self,
         bucket_id: str,
         ttl: Optional[Union[float, timedelta, str]] = None,
-    ) -> dict[str, str]:
+    ) -> BaseBucket:
         """Retrieves the details of an existing storage bucket.
 
         Parameters
@@ -270,32 +296,34 @@ class SupabaseConnection(BaseConnection[Client]):
         bucket_id : str
             Unique identifier of the bucket you would like to retrieve.
         ttl : float, timedelta, str, or None
-            The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
+            The maximum time to keep an entry in the cache. Defaults to `None` (no time-based expiration; at most 128 cached entries).
         """
 
-        @cache_resource(ttl=ttl)
-        def _get_bucket(_self, bucket_id):
-            return _self.client.storage.get_bucket(bucket_id)
+        @cache_data(ttl=ttl, max_entries=_MAX_CACHE_ENTRIES)
+        def _get_bucket(_storage, scope, bucket_id):
+            return _storage.get_bucket(bucket_id)
 
-        return _get_bucket(self, bucket_id)
+        storage = self.client.storage
+        return _get_bucket(storage, self._storage_cache_key(storage), bucket_id)
 
     def list_buckets(
         self,
         ttl: Optional[Union[float, timedelta, str]] = None,
-    ) -> list[dict[str, str]]:
-        """Retrieves the details of all storage buckets within an existing product.
+    ) -> list[BaseBucket]:
+        """Retrieves the details of all storage buckets within the project.
 
         Parameters
         ----------
         ttl : float, timedelta, str, or None
-            The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
+            The maximum time to keep an entry in the cache. Defaults to `None` (no time-based expiration; at most 128 cached entries).
         """
 
-        @cache_resource(ttl=ttl)
-        def _list_buckets(_self):
-            return _self.client.storage.list_buckets()
+        @cache_data(ttl=ttl, max_entries=_MAX_CACHE_ENTRIES)
+        def _list_buckets(_storage, scope):
+            return _storage.list_buckets()
 
-        return _list_buckets(self)
+        storage = self.client.storage
+        return _list_buckets(storage, self._storage_cache_key(storage))
 
     def create_bucket(
         self,
@@ -320,27 +348,24 @@ class SupabaseConnection(BaseConnection[Client]):
         allowed_mime_types : list[str]
             List of file types that can be uploaded to this bucket. Pass `None` to allow all file types. Defaults to `None`.
         """
-        response = self.client.storage._request(
-            method="POST",
-            url="/bucket",
-            json={
-                "id": id,
-                "name": name or id,
+        return self.client.storage.create_bucket(
+            id,
+            name=name,
+            options={
                 "public": public,
                 "file_size_limit": file_size_limit,
                 "allowed_mime_types": allowed_mime_types,
             },
         )
-        return response.json()
 
     def upload(
         self,
         bucket_id: str,
         source: Literal["local", "hosted"],
-        file: Union[str, Path, BytesIO],
+        file: Union[str, Path, BytesIO, bytes, IO[bytes]],
         destination_path: str,
         overwrite: Literal["true", "false"] = "false",
-    ) -> "dict[str, str]":
+    ) -> UploadResponse:
         """Uploads a file to a Supabase bucket.
 
         Parameters
@@ -350,9 +375,10 @@ class SupabaseConnection(BaseConnection[Client]):
         source : str
             "local" to upload file from your local filesystem,
             "hosted" to upload file from the Streamlit hosted filesystem.
-        file : str, Path, BytesIO
+        file : str, Path, BytesIO, bytes, IO[bytes]
             File to upload. This can be a path of the file if `source="hosted"`,
             or the `BytesIO` object returned by `st.file_uploader()` if `source="local"`.
+            Raw bytes and open binary streams are also accepted.
         destination_path : str
             Path is the bucket where the file will be uploaded to.
             Folders will be created as needed. Defaults to `/filename.fileext`.
@@ -397,7 +423,7 @@ class SupabaseConnection(BaseConnection[Client]):
         source_path : str
             Path of the file relative in the bucket, including file name
         ttl : float, timedelta, str, or None
-            The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
+            The maximum time to keep an entry in the cache. Defaults to `None` (no time-based expiration; at most 128 cached entries).
 
         Returns
         -------
@@ -409,16 +435,17 @@ class SupabaseConnection(BaseConnection[Client]):
             Downloaded bytes object
         """
 
-        @cache_resource(ttl=ttl)
-        def _download(_self, bucket_id, source_path):
+        @cache_data(ttl=ttl, max_entries=_MAX_CACHE_ENTRIES)
+        def _download(_storage, scope, bucket_id, source_path):
             file_name = source_path.split("/")[-1]
 
-            data = _self.client.storage.from_(bucket_id).download(source_path)
+            data = _storage.from_(bucket_id).download(source_path)
             mime = mimetypes.guess_type(file_name)[0] or "application/octet-stream"
 
             return file_name, mime, data
 
-        return _download(self, bucket_id, source_path)
+        storage = self.client.storage
+        return _download(storage, self._storage_cache_key(storage), bucket_id, source_path)
 
     def update_bucket(
         self,
@@ -440,15 +467,18 @@ class SupabaseConnection(BaseConnection[Client]):
         allowed_mime_types : str
             The file MIME types that can be uploaded to the bucket. Pass a string or list of strings. Defaults to `None` for no restriction.
         """
-        json = {
-            "id": bucket_id,
-            "name": bucket_id,
-            "public": public,
-            "file_size_limit": file_size_limit,
-            "allowed_mime_types": allowed_mime_types,
-        }
-        response = self.client.storage._request("PUT", f"/bucket/{bucket_id}", json=json)
-        return response.json()
+        return self.client.storage.update_bucket(
+            bucket_id,
+            options={
+                "public": public,
+                "file_size_limit": file_size_limit,
+                "allowed_mime_types": (
+                    [allowed_mime_types]
+                    if isinstance(allowed_mime_types, str)
+                    else allowed_mime_types
+                ),
+            },
+        )
 
     def move(self, bucket_id: str, from_path: str, to_path: str) -> "dict[str, str]":
         """Moves an existing file, optionally renaming it at the same time.
@@ -462,18 +492,9 @@ class SupabaseConnection(BaseConnection[Client]):
         to_path : str
             The new file path, including the new file name. Path will be created if it doesn't exist.
         """
-        response = self.client.storage._request(
-            "POST",
-            "/object/move",
-            json={
-                "bucketId": bucket_id,
-                "sourceKey": from_path,
-                "destinationKey": to_path,
-            },
-        )
-        return response.json()
+        return self.client.storage.from_(bucket_id).move(from_path, to_path)
 
-    def remove(self, bucket_id: str, paths: list) -> "dict[str, str]":
+    def remove(self, bucket_id: str, paths: list[str]) -> list[dict[str, Any]]:
         """Deletes files within the same bucket
 
         Parameters
@@ -483,12 +504,7 @@ class SupabaseConnection(BaseConnection[Client]):
         paths : list
             An array or list of files to be deletes, including the path and file name. For example [`folder/image.png`].
         """
-        response = self.client.storage._request(
-            "DELETE",
-            f"/object/{bucket_id}",
-            json={"prefixes": paths},
-        )
-        return response.json()
+        return self.client.storage.from_(bucket_id).remove(paths)
 
     def list_objects(
         self,
@@ -499,7 +515,7 @@ class SupabaseConnection(BaseConnection[Client]):
         sortby: Optional[Literal["name", "updated_at", "created_at", "last_accessed_at"]] = "name",
         order: Optional[Literal["asc", "desc"]] = "asc",
         ttl: Optional[Union[float, timedelta, str]] = None,
-    ) -> "list[dict[str, str]]":
+    ) -> list[dict[str, Any]]:
         """Lists all the objects within a bucket.
 
         Parameters
@@ -517,12 +533,12 @@ class SupabaseConnection(BaseConnection[Client]):
         order : str
             The sorting order. Defaults to "asc".
         ttl : float, timedelta, str, or None
-            The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
+            The maximum time to keep an entry in the cache. Defaults to `None` (no time-based expiration; at most 128 cached entries).
         """
 
-        @cache_data(ttl=ttl)
-        def _list_objects(_self, bucket_id, path, limit, offset, sortby, order):
-            return _self.client.storage.from_(bucket_id).list(
+        @cache_data(ttl=ttl, max_entries=_MAX_CACHE_ENTRIES)
+        def _list_objects(_storage, scope, bucket_id, path, limit, offset, sortby, order):
+            return _storage.from_(bucket_id).list(
                 path,
                 dict(
                     limit=limit,
@@ -531,7 +547,10 @@ class SupabaseConnection(BaseConnection[Client]):
                 ),
             )
 
-        return _list_objects(self, bucket_id, path, limit, offset, sortby, order)
+        storage = self.client.storage
+        return _list_objects(
+            storage, self._storage_cache_key(storage), bucket_id, path, limit, offset, sortby, order
+        )
 
     def create_signed_urls(
         self,
@@ -558,21 +577,19 @@ class SupabaseConnection(BaseConnection[Client]):
         filepath: str,
         ttl: Optional[Union[float, timedelta, str]] = None,
     ) -> str:
-        """Parameters
+        """Construct a public URL locally, without an HTTP request or result cache.
+
+        Parameters
         ----------
         bucket_id : str
             Unique identifier of the bucket.
         filepath : str
             File path to be downloaded, including the current file name.
         ttl : float, timedelta, str, or None
-            The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
+            Retained for compatibility and ignored; URL construction is not cached.
         """
 
-        @cache_data(ttl=ttl)
-        def _get_public_url(_self, bucket_id, filepath):
-            return _self.client.storage.from_(bucket_id).get_public_url(filepath)
-
-        return _get_public_url(self, bucket_id, filepath)
+        return self.client.storage.from_(bucket_id).get_public_url(filepath)
 
     def create_signed_upload_url(self, bucket_id: str, path: str) -> "dict[str, str]":
         """Parameters
@@ -598,7 +615,7 @@ class SupabaseConnection(BaseConnection[Client]):
         token: str,
         file: Union[str, Path, BytesIO, bytes, IO[bytes]],
     ) -> "dict[str, str]":
-        """Upload a file with a token generated from `.create_signed_url()`
+        """Upload a file with a token generated from `.create_signed_upload_url()`.
 
         Parameters
         ----------
@@ -608,7 +625,7 @@ class SupabaseConnection(BaseConnection[Client]):
             The file path, including the file name. This path will be created if it does not exist.
             Leading slashes are stripped; empty values raise an error.
         token : str
-            The token generated from `.create_signed_url()` for the specified `path`
+            The token generated from `.create_signed_upload_url()` for the specified `path`
         file : str, Path, BytesIO, bytes, IO[bytes]
             File to upload. Accepts:
                 * A local path (`str` or `pathlib.Path`)
@@ -644,29 +661,24 @@ def execute_query(
     query: Union[SyncSelectRequestBuilder, SyncQueryRequestBuilder, SyncFilterRequestBuilder],
     ttl: Optional[Union[float, timedelta, str]] = None,
 ) -> APIResponse:
-    """Execute the query.
-    This function is a wrapper around the `query.execute()` method, with caching enabled.
-    This works with all types of queries, but caching may lead to unexpected results when running DML queries.
+    """Execute a query, caching only GET/HEAD reads as independent response copies.
 
-    It is recommended to set `ttl` to 0 for DML queries (insert, update, upsert, delete) to avoid caching issues.
+    Writes, POST-based RPC calls, and unrecognized request methods always execute
+    directly, regardless of ``ttl``. Set ``ttl=0`` to bypass caching for reads too.
 
     Parameters
     ----------
     query : SyncSelectRequestBuilder, SyncQueryRequestBuilder, SyncFilterRequestBuilder
         The query to execute. Can contain any number of chained filters and operators.
     ttl : float, timedelta, str, or None
-        The maximum time to keep an entry in the cache. Defaults to `None` (cache never expires).
+        The maximum time to keep an entry in the cache. Defaults to `None` (no time-based expiration; at most 128 cached entries).
     """
 
-    @cache_resource(
-        ttl=ttl,
-        hash_funcs={
-            SyncSelectRequestBuilder: _query_hash,
-            SyncQueryRequestBuilder: _query_hash,
-            SyncFilterRequestBuilder: _query_hash,
-        },
-    )
-    def _execute(query):
+    if ttl == 0 or _query_method(query) not in {"GET", "HEAD"}:
         return query.execute()
 
-    return _execute(query)
+    @cache_data(ttl=ttl, max_entries=_MAX_CACHE_ENTRIES)
+    def _execute(_query, query_key):
+        return _query.execute()
+
+    return _execute(query, _query_hash(query))

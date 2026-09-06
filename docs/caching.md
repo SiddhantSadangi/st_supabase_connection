@@ -2,6 +2,8 @@
 
 Streamlit Supabase Connection uses Streamlit caching for the connection object and for selected read results. Those caches have different scopes and should be configured separately.
 
+Starting with 2.2.1, result caches use `st.cache_data`: each caller receives an independent copy, not a shared mutable response. Connection objects remain resources.
+
 ## Cache types
 
 | Cache | Configuration | Purpose |
@@ -50,6 +52,12 @@ file_name, mime_type, data = connection.download(
 
 `ttl=None` retains a result without time-based expiration. Prefer a finite value for content that can change.
 
+Storage result keys include the project, API key, and current authorization/header context as an opaque fingerprint. Connections to different projects or using different credentials cannot reuse each other's entries. `ttl=0` fetches fresh data on every call.
+
+The convenience wrappers use the connection's shared client. For signed-in Storage access, use `connection.session_client().storage` directly; cache isolation does not make a process-shared Auth client safe.
+
+`get_public_url()` only constructs a URL locally. It is no longer cached; its `ttl` parameter is accepted for compatibility and ignored.
+
 ## Database result caching
 
 Use `execute_query()` for reads that benefit from caching:
@@ -93,7 +101,7 @@ Use the same `supabase` client for sign-in and for the query so its current JWT 
 
 ## Writes and immediate consistency
 
-Do not cache inserts, updates, upserts, or deletes. Call `.execute()` directly:
+Inserts, updates, upserts, and deletes must execute every time. You can call `.execute()` directly:
 
 ```python
 response = (
@@ -103,7 +111,7 @@ response = (
 )
 ```
 
-For compatibility, a write can be passed through `execute_query(..., ttl=0)`, but direct execution communicates the intent more clearly.
+In 2.2.1, `execute_query()` automatically bypasses caching for writes, POST-based RPC calls, and unrecognized request methods, regardless of `ttl`. Existing `ttl=0` calls still work. Only GET/HEAD requests are eligible for caching; `ttl=0` bypasses caching for those reads too.
 
 Writing data does not automatically invalidate earlier cached reads. When the UI must show a write immediately, fetch the next read directly with `.execute()` or use `ttl=0`. Otherwise, let the read's finite TTL expire.
 
@@ -121,6 +129,15 @@ Do not put the session client or Auth response in `st.cache_resource`, a module-
 `cached_sign_in_with_password()` is deprecated. Despite its legacy name, version 2.2.0 no longer caches its result and ignores its `ttl` argument.
 
 ## Cache growth
+
+Starting with 2.2.1, each library read cache retains at most **128 entries**, shared
+across projects and users within that process. Entries remain isolated by their
+cache keys; the oldest entries are evicted when the cache fills. `ttl=None` still
+means no time-based expiration, not guaranteed indefinite retention.
+
+This limits entry count, not total bytes. Use `ttl=0` for large downloads, and keep
+query result sizes bounded. The demo fetches fresh results by default; opting into
+caching starts with a 60-second TTL.
 
 Parameterized reads can create many cache entries. Use finite TTLs for high-cardinality queries, especially user-specific or search-driven requests. Avoid caching a new result for every keystroke; submit search inputs through a form or otherwise limit the number of distinct queries.
 

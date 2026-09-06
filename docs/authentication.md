@@ -76,6 +76,11 @@ The generic error avoids revealing whether a particular email address exists. Ap
 
 ## Check the current session
 
+When the signed-in user changes or signs out, clear user-specific displayed results,
+download payloads, and pending write confirmations. Changing the SDK's Auth session
+does not clear your application's `st.session_state`. The demo performs this check
+before rendering each workspace; it does not flush other users' global caches.
+
 ```python
 supabase = connection.session_client()
 session = supabase.auth.get_session()
