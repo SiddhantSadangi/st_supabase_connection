@@ -26,7 +26,7 @@ jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 MarkupSafe==3.0.3
 multidict==6.7.1
-narwhals==2.25.0
+narwhals==2.26.0
 numpy==2.5.2
 packaging==26.3
 pandas==3.0.5
