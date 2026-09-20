@@ -39,7 +39,7 @@ pycparser==3.0
 pydantic==2.13.5
 pydantic_core==2.46.5
 pydeck==0.9.3
-PyJWT==2.13.0
+PyJWT==2.14.0
 python-dateutil==2.9.0.post0
 python-multipart==0.0.32
 realtime==2.31.0
