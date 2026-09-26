@@ -33,7 +33,7 @@ pandas==3.0.5
 pillow==12.3.0
 postgrest==2.31.0
 propcache==0.5.2
-protobuf==7.36.1
+protobuf==7.36.2
 pyarrow==25.0.1
 pycparser==3.0
 # Pydantic pins its exact compatible pydantic-core version; do not pin it separately.
