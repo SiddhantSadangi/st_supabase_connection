@@ -52,7 +52,7 @@ storage3==2.31.0
 streamlit==1.64.0
 StrEnum==0.4.15
 supabase==2.31.0
-supabase-auth==2.31.0
+supabase-auth==2.32.0
 supabase-functions==2.31.0
 toml==0.10.2
 typing-inspection==0.4.4
