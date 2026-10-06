@@ -42,7 +42,7 @@ pydeck==0.9.3
 PyJWT==2.15.0
 python-dateutil==2.9.0.post0
 python-multipart==0.0.32
-realtime==2.31.0
+realtime==2.32.0
 referencing==0.37.0
 requests==2.34.2
 rpds-py==2026.6.3
