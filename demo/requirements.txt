@@ -59,7 +59,7 @@ typing-inspection==0.4.4
 typing_extensions==4.16.0
 tzdata==2026.4
 urllib3==2.8.0
-uvicorn==0.52.4
+uvicorn==0.54.0
 watchdog==6.0.0
 websockets==15.0.1
 yarl==1.25.1
