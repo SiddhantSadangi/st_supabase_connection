@@ -35,7 +35,7 @@ postgrest==2.32.0
 propcache==0.5.4
 protobuf==7.36.2
 pyarrow==25.0.1
-pycparser==3.0
+pycparser==3.11
 # Pydantic pins its exact compatible pydantic-core version; do not pin it separately.
 pydantic==2.13.5
 pydeck==0.9.3
