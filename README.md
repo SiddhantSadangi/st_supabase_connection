@@ -38,7 +38,7 @@ Use Supabase Storage, Database, and Auth from Streamlit with Streamlit-aware cac
 |---|---|
 | Python | 3.10 or newer |
 | Streamlit | 1.62.0 or newer |
-| Supabase Python | 2.22.0 or newer |
+| Supabase Python | >=2.22.0, <3 |
 
 ## Quickstart
 
@@ -209,7 +209,7 @@ This patch fixes Storage cache isolation between projects and credentials, preve
 
 ### From 2.1.x to 2.2.x
 
-Version 2.2.0 requires Python 3.10+, Streamlit 1.62.0+, and Supabase Python 2.22.0+.
+Version 2.2.0 requires Python 3.10+, Streamlit 1.62.0+, and Supabase Python >=2.22.0, <3.
 
 Apps using Auth should replace process-shared access:
 
