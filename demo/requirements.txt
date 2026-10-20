@@ -48,7 +48,7 @@ requests==2.34.2
 rpds-py==2026.6.3
 six==1.17.0
 starlette==1.7.0
-storage3==2.32.0
+storage3==2.33.0
 streamlit==1.65.0
 StrEnum==0.4.15
 supabase==2.32.0
