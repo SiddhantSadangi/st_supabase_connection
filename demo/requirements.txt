@@ -31,7 +31,7 @@ narwhals==2.27.1
 numpy==2.5.2
 packaging==26.3
 pandas==3.0.5
-pillow==12.3.0
+pillow==13.0.0
 postgrest==2.33.0
 propcache==0.5.4
 protobuf==7.36.2
@@ -50,7 +50,7 @@ rpds-py==2026.6.3
 six==1.17.0
 starlette==1.7.0
 storage3==2.33.0
-streamlit==1.65.0
+streamlit==1.66.1
 StrEnum==0.4.15
 supabase==2.33.0
 supabase-auth==2.33.0
