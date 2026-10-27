@@ -243,13 +243,17 @@ The CI workflow tests Python 3.10–3.14 against the minimum and latest supporte
 For the reproducible demo runtime, use **Python 3.12** and run from the repository root:
 
 ```bash
-python -m pip install -r demo/requirements.txt
+python -m pip install -r requirements.txt
 python -m pip check
 python -m streamlit run demo/app.py
 ```
 
-`demo/requirements.txt` pins the demo environment, including transitive dependencies;
+`requirements.txt` pins the demo environment, including transitive dependencies;
 the published library keeps flexible dependency ranges. CI also tests this pinned set.
+Keep this file at the repository root beside `setup.py`: its `-e .` installs the
+checked-out library, and Dependabot resolves that path from its configured root directory.
+Streamlit Community Cloud also discovers this root file for `demo/app.py`; do not add
+a separate `demo/requirements.txt` that would shadow it.
 Refresh the pins in a clean Python 3.12 environment when upgrading the demo, and run
 the suite plus the browser smoke checklist in [RELEASING.md](RELEASING.md).
 
