@@ -6,17 +6,15 @@
 version: 2
 updates:
   - package-ecosystem: "pip" # See documentation for possible values
-    directory: "/" # Location of package manifests
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: "pip"
-    directory: "/demo"
+    directory: "/" # requirements.txt and the editable package share the repository root
     schedule:
       interval: "weekly"
     groups:
       demo-runtime:
         patterns: ["*"]
+        # Keep build-tool updates separate from the coupled demo runtime.
+        exclude-patterns: ["setuptools", "wheel"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

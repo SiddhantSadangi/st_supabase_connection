@@ -7,7 +7,7 @@ from unittest.mock import patch
 from streamlit.testing.v1 import AppTest
 
 APP_PATH = Path(__file__).parents[1] / "demo" / "app.py"
-DEMO_REQUIREMENTS_PATH = APP_PATH.with_name("requirements.txt")
+DEMO_REQUIREMENTS_PATH = APP_PATH.parents[1] / "requirements.txt"
 
 
 class FakeAuth:
@@ -96,6 +96,13 @@ class FakeConnection:
 
 
 class DemoAppTests(unittest.TestCase):
+    def test_demo_requirements_share_the_editable_package_root(self):
+        self.assertTrue((DEMO_REQUIREMENTS_PATH.parent / "setup.py").is_file())
+        self.assertFalse(
+            APP_PATH.with_name("requirements.txt").exists(),
+            "A demo requirements file would shadow the root manifest on Community Cloud",
+        )
+
     def test_demo_installs_the_checked_out_library(self):
         requirements = DEMO_REQUIREMENTS_PATH.read_text(encoding="utf-8").splitlines()
         self.assertIn("-e .", requirements)
