@@ -5,12 +5,12 @@
 
 altair==6.2.2
 annotated-types==0.8.0
-anyio==4.15.1
+anyio==4.16.0
 attrs==26.1.0
 certifi==2026.10.23
 cffi==2.1.1
 charset-normalizer==3.5.2
-click==8.5.0
+click==8.5.1
 cryptography==50.0.2
 deprecation==2.1.0
 h11==0.16.0
@@ -27,7 +27,7 @@ jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 MarkupSafe==3.0.4
 multidict==7.1.0
-narwhals==2.27.1
+narwhals==2.28.0
 numpy==2.5.2
 packaging==26.3
 pandas==3.0.5
@@ -38,7 +38,7 @@ protobuf==7.36.2
 pyarrow==25.0.1
 pycparser==3.11
 # Pydantic pins its exact compatible pydantic-core version; do not pin it separately.
-pydantic==2.14.1
+pydantic==2.14.3
 pydeck==0.9.3
 PyJWT==2.15.1
 python-dateutil==3.0.0
@@ -51,16 +51,16 @@ six==1.17.0
 starlette==1.7.0
 storage3==2.33.0
 streamlit==1.66.1
-StrEnum==0.4.15
+StrEnum==0.5.0
 supabase==2.33.0
 supabase-auth==2.33.0
 supabase-functions==2.33.0
 toml==0.10.2
-typing-inspection==0.4.4
+typing-inspection==0.4.5
 typing_extensions==4.16.0
-tzdata==2026.5
+tzdata==2026.6
 urllib3==2.8.0
 uvicorn==0.54.0
 watchdog==6.0.0
-websockets==15.0.1
+websockets==16.1.1
 yarl==1.25.1
