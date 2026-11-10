@@ -62,5 +62,6 @@ tzdata==2026.6
 urllib3==2.8.0
 uvicorn==0.54.0
 watchdog==6.0.0
-websockets==16.1.1
+# realtime 2.33.0 requires websockets>=11,<16; update with the Supabase SDK cohort.
+websockets==15.0.1
 yarl==1.25.1
