@@ -9,6 +9,10 @@ updates:
     directory: "/" # requirements.txt and the editable package share the repository root
     schedule:
       interval: "weekly"
+    ignore:
+      # realtime 2.33.0 requires websockets<16; revisit with the Supabase SDK cohort.
+      - dependency-name: "websockets"
+        versions: [">=16"]
     groups:
       demo-runtime:
         patterns: ["*"]
